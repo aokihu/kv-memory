@@ -14,6 +14,7 @@ export class KVMemoryService {
   }
 
   async getMemory(key: string) {
+    console.log("Get Memory Key,", key)
     const value = await KVMemory.getInstance().get(key);
     if (!value) {
       throw new Error(`KVMemory: get: key ${key} not found`)
@@ -31,7 +32,8 @@ export class KVMemoryService {
   async traverseMemory(key: string) {
     const value = await KVMemory.getInstance().get(key);
     if (!value) {
-      throw new Error(`KVMemory: traverse: key ${key} not found`)
+      // throw new Error(`KVMemory: traverse: key ${key} not found`)
+      return undefined
     }
 
     const meta = value.meta;

@@ -13,8 +13,19 @@ type RequestBody = {
 
 export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ctx: AppServerContext) => {
 
-    // 从body中提取数据
-    const { key, session } = req.body as unknown as RequestBody;
+    let body: RequestBody;
+    try {
+        body = await req.json();
+    } catch {
+        return Response.json({ success: false, message: "invalid json" }, { status: 400 });
+    }
+
+    const { key, session } = body;
+
+    if (!key || !session) {
+        return Response.json({ success: false, message: "missing key or session" }, { status: 400 });
+    }
+
 
     // 验证session
     const sessionData = await ctx.sessionService.getSession(session);
@@ -28,13 +39,13 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
     // 从session中获取用户之前访问的记忆key
     const lastMemoryKey = sessionData.last_memory_key;
 
-    if(lastMemoryKey !== '') {
+    if (lastMemoryKey !== '') {
         // 更新上一次访问的记忆连接记录
-        ctx.kvMemoryService.traverseMemory(lastMemoryKey);
+        await ctx.kvMemoryService.traverseMemory(lastMemoryKey);
     }
 
     // 从KVDB中获取内存
-    const memory = ctx.kvMemoryService.getMemory(key);
+    const memory = await ctx.kvMemoryService.getMemory(key);
     if (!memory) {
         return Response.json({
             success: false,
@@ -43,7 +54,7 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
     }
 
     // 更新session中的last_memory_key
-    ctx.sessionService.setSession(session, { last_memory_key: key });
+    await ctx.sessionService.setSession(session, { last_memory_key: key });
 
     return Response.json({
         success: true,

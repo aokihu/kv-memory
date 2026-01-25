@@ -12,13 +12,22 @@ type RequestBody = {
     value: Optional<KVValue, "keywords" | "links">,
 }
 
-export const addMemoryController = async (req: Bun.BunRequest<"/login">, ctx: AppServerContext) => {
+export const addMemoryController = async (req: Bun.BunRequest<"/add_memory">, ctx: AppServerContext) => {
 
-    // 获取提交的key和value
-    const { key, value } = req.body as unknown as RequestBody;
+    let body: RequestBody;
+    try {
+        body = await req.json();
+    } catch {
+        return Response.json({ success: false, message: "invalid json" }, { status: 400 });
+    }
 
-    // 调用服务层添加记忆
-    ctx.kvMemoryService.addMemory(key, value);
+    const { key, value } = body;
 
-    return Response.json({success: true});
+    if (!key || !value) {
+        return Response.json({ success: false, message: "missing key or value" }, { status: 400 });
+    }
+
+    await ctx.kvMemoryService.addMemory(key, value);
+
+    return Response.json({ success: true });
 }

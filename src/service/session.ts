@@ -5,13 +5,14 @@
  */
 
 import { Keyv } from "keyv";
+import { KeyvSqlite } from '@keyv/sqlite'
 import type { SessionValue } from "../type";
 
 export class SessionService {
   private sessionKeyv;
 
   constructor() {
-    this.sessionKeyv = new Keyv<SessionValue>({ ttl: 180000 });
+    this.sessionKeyv =  new Keyv<SessionValue>(new KeyvSqlite({uri: "sqlite://session.db"}),{ ttl: 180000 });
   }
 
   /**
@@ -24,7 +25,7 @@ export class SessionService {
    */
   async generateSession() {
     const key = Bun.CryptoHasher.hash("md5", Date.now().toString()).toHex();
-    await this.sessionKeyv.set(key, { last_accessed_key: '' });
+    await this.sessionKeyv.set(key, { last_memory_key: '' });
     return key;
   }
 

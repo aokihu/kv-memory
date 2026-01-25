@@ -2,6 +2,7 @@
   "name": "kvdb-mem",
   "module": "index.ts",
   "type": "module",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "bun run --watch ./src/index.ts"

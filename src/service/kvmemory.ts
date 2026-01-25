@@ -3,13 +3,15 @@
  * @author aokihu <aokihu@gmail.com>
  * @license MIT
  */
-
+import {z} from 'zod'
 import { KVMemory } from '../libs/kv';
 import { Optional, KVValue } from '../type';
+import { type MemoryNoMeta} from '../type'
+
 
 export class KVMemoryService {
 
-  async addMemory(key: string, arg: Optional<KVValue, "keywords" | "links">) {
+  async addMemory(key: string, arg: MemoryNoMeta ) {
     await KVMemory.getInstance().add(key, arg)
   }
 
@@ -27,6 +29,18 @@ export class KVMemoryService {
     await KVMemory.getInstance().setMeta(key, meta)
 
     return value
+  }
+
+  /**
+   * 更新记忆
+   * @param key 记忆的key
+   * @param arg 记忆的value
+   * @description 用户手动更新记忆内容
+   */
+  async updateMemory(key: string, arg: Optional<KVValue, "keywords" | "links">) {
+
+
+    await KVMemory.getInstance().update(key, arg)
   }
 
   async traverseMemory(key: string) {

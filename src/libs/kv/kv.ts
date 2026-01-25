@@ -4,8 +4,9 @@
  * @license MIT
  */
 
+import {z} from 'zod'
 import Keyv from "keyv";
-import { KVStatusEnums, type KVValue, type Optional } from "../../type";
+import { KVStatusEnums, type MemoryNoMeta, type KVValue, type Optional } from "../../type";
 import { KeyvSqlite } from '@keyv/sqlite'
 
 export class KVMemory {
@@ -23,7 +24,7 @@ export class KVMemory {
     return KVMemory.instance;
   }
 
-  async add(key: string, arg: Optional<KVValue, "keywords" | "links">) {
+  async add(key: string, arg: MemoryNoMeta) {
     const now = Date.now();
 
     // 初始化元数据

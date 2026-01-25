@@ -1,12 +1,12 @@
 /**
  * 添加记忆
  * @param key {string} 记忆的key
- * @param arg {Optional<KVValue, "keywords" | "links">} 记忆的value
+ * @param arg {MemoryNoMeta} 记忆的value
  * @description
  */
 import z from 'zod'
 import { MemoryNoMetaSchema } from '../type'
-import type { Optional, KVValue, AppServerContext } from "../type";
+import type { MemoryNoMeta, AppServerContext } from "../type";
 
 
 
@@ -19,25 +19,34 @@ const RequestBodySchema = z.object({
     }),
 })
 
-type RequestBody = z.infer<typeof RequestBodySchema>
+type RequestBody = {
+    key: string;
+    value: MemoryNoMeta;
+}
 
 
 /* 控制器 */
 export const addMemoryController = async (req: Bun.BunRequest<"/add_memory">, ctx: AppServerContext) => {
-    const body = await req.json() as unknown as RequestBody;
-    const result = RequestBodySchema.safeParse(body);
 
-    if (result.error) {
-        return Response.json({ success: false, message: result.error.issues }, { status: 400 });
+    try {
+        const body = await req.json() as unknown as RequestBody;
+
+        const result = RequestBodySchema.safeParse(body);
+
+        if (result.error) {
+            return Response.json({ success: false, message: result.error.issues }, { status: 400 });
+        }
+
+        const { key, value } = result.data;
+
+        await ctx.kvMemoryService.addMemory(key, {
+            ...value,
+            links: value.links ?? [],
+            keywords: value.keywords ?? [],
+        });
+
+        return Response.json({ success: true });
+    } catch (error) {
+        return Response.json({ success: false, message: "JSON parsed error" }, { status: 400 });
     }
-
-    const { key, value } = result.data;
-
-    await ctx.kvMemoryService.addMemory(key, {
-        ...value,
-        links: value.links ?? [],
-        keywords: value.keywords ?? [],
-    });
-    
-    return Response.json({ success: true });
 }

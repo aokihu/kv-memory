@@ -4,17 +4,24 @@
  * @license MIT
  */
 
-import {z} from 'zod'
+import { z } from 'zod'
 import Keyv from "keyv";
-import { KVStatusEnums, type MemoryNoMeta, type KVValue, type Optional } from "../../type";
+import {
+  MemorySchema,
+  MemoryMetaSchema,
+  MemoryStatusEnums,
+  type Memory,
+  type MemoryMeta,
+  type MemoryNoMeta,
+} from "../../type";
 import { KeyvSqlite } from '@keyv/sqlite'
 
 export class KVMemory {
   static instance: KVMemory;
-  private _kv: Keyv;
+  private _kv: Keyv<Memory>;
 
   constructor() {
-    this._kv = new Keyv<KVValue>(new KeyvSqlite({ uri: 'sqlite://kv.db' }), { ttl: 180000 })
+    this._kv = new Keyv<Memory>(new KeyvSqlite({ uri: 'sqlite://kv.db' }), { ttl: 180000 })
   }
 
   static getInstance(): KVMemory {
@@ -37,7 +44,7 @@ export class KVMemory {
       out_degree: 0,
       access_count: 0,
       traverse_count: 0,
-      status: KVStatusEnums.ACTIVE,
+      status: MemoryStatusEnums.parse("active"),
     }
 
     const memory = { ...arg, meta };
@@ -45,11 +52,11 @@ export class KVMemory {
     await this._kv.set(key, memory)
   }
 
-  async get(key: string):Promise<KVValue | undefined> {
+  async get(key: string): Promise<Memory | undefined> {
     return await this._kv.get(key)
   }
 
-  async setMeta(key: string, meta: KVValue["meta"]) {
+  async setMeta(key: string, meta: MemoryMeta) {
     const value = await this._kv.get(key)
     if (!value) {
       throw new Error(`KVMemory: setMeta: key ${key} not found`)
@@ -57,7 +64,7 @@ export class KVMemory {
     await this._kv.set(key, { ...value, meta })
   }
 
-  async update(key:string, arg: Optional<KVValue, keyof KVValue>) {
+  async update(key: string, arg: Partial<Memory>) {
     const value = await this._kv.get(key)
     if (!value) {
       throw new Error(`KVMemory: update: key ${key} not found`)

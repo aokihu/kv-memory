@@ -4,13 +4,19 @@
  * @license MIT
  * @summary 获取记忆,并且更新记忆的meta数据
  */
+import { z } from 'zod'
 import { AppServerContext } from "../type"
 
-type RequestBody = {
-    key: string,
-    session: string,
-}
+/* 类型定义 */
+const RequestBodySchema = z.object({
+    key: z.string(),
+    session: z.string()
+})
 
+type RequestBody = z.infer<typeof RequestBodySchema>
+
+
+/* 控制器 */
 export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ctx: AppServerContext) => {
 
     let body: RequestBody;
@@ -20,12 +26,14 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
         return Response.json({ success: false, message: "invalid json" }, { status: 400 });
     }
 
-    const { key, session } = body;
+    // 检验请求体
+    const result = RequestBodySchema.safeParse(body);
 
-    if (!key || !session) {
-        return Response.json({ success: false, message: "missing key or session" }, { status: 400 });
+    if (result.error) {
+        return Response.json({ success: false, message: result.error.issues }, { status: 400 });
     }
 
+    const { key, session } = result.data;
 
     // 验证session
     const sessionData = await ctx.sessionService.getSession(session);

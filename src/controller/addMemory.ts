@@ -20,5 +20,5 @@ export const addMemoryController = async (req: Bun.BunRequest<"/login">, ctx: Ap
     // 调用服务层添加记忆
     ctx.kvMemoryService.addMemory(key, value);
 
-    return Response.json({});
+    return Response.json({success: true});
 }

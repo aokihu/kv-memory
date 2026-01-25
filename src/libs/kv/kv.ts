@@ -24,14 +24,10 @@ export class KVMemory {
   }
 
   async add(key: string, arg: Optional<KVValue, "keywords" | "links">) {
-    // 初始化链接和关键词
-    arg.links = arg.links || [];
-    arg.keywords = arg.keywords || [];
-
     const now = Date.now();
 
     // 初始化元数据
-    arg.meta = {
+    const meta = {
       id: key,
       created_at: now,
       last_accessed_at: now,
@@ -43,7 +39,9 @@ export class KVMemory {
       status: KVStatusEnums.ACTIVE,
     }
 
-    await this._kv.set(key, arg)
+    const memory = { ...arg, meta };
+
+    await this._kv.set(key, memory)
   }
 
   async get(key: string):Promise<KVValue | undefined> {

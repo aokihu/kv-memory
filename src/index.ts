@@ -18,12 +18,16 @@ const server = Bun.serve({
   port: 3000,
   routes: {
     "/login": (req) => loginController(req, context),
-    "/get_memory": (req) => getMemoryController(req, context),
+    "/get_memory": { POST: (req) => getMemoryController(req, context) },
     "/add_memory": {
       POST: (req) => addMemoryController(req, context),
     },
-    "/update_memory": () => new Response(),
-    "/update_memory_key": () => new Response(),
+    "/update_memory": {
+      POST: () => new Response(),
+    },
+    "/update_memory_key": {
+      POST: () => new Response(),
+    },
   }
 });
 

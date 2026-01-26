@@ -124,6 +124,21 @@ bun test
 
 ---
 
+## Layered Validation Principles
+
+- 将数据校验集中在 controller 层，确保下游接收的是规范化后的输入  
+- service 层信任 controller 的验证结果，仅专注业务流程与状态管理  
+- lib 层信任 service 层传递的数据，聚焦工具、算法与重用  
+- 各层职责清晰分离，数据流自上而下，下层不再做完整性判断
+
+## Layer Responsibilities
+
+- **Controller 层**：接收外部请求，完成参数校验与必要格式化，将合法输入推入业务流  
+- **Service 层**：以已验证数据为基础执行业务逻辑、状态变更与依赖协调  
+- **Lib 层**：提供底层工具与算法，假设输入已由上层处理并优化性能与复用性
+
+---
+
 ## Related Documents
 
 - 记忆模型衰退算法[@/docs/MEMORY_ALGORITHM.md]

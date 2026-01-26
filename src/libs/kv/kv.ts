@@ -4,11 +4,8 @@
  * @license MIT
  */
 
-import { z } from 'zod'
 import Keyv from "keyv";
 import {
-  MemorySchema,
-  MemoryMetaSchema,
   MemoryStatusEnums,
   type Memory,
   type MemoryMeta,
@@ -77,7 +74,15 @@ export class KVMemory {
     if (!value) {
       throw new Error(`KVMemory: updateKey: key ${oldKey} not found`)
     }
-    await this._kv.set(newKey, value)
+    const memory = value as Memory
+    const updated: Memory = {
+      ...memory,
+      meta: {
+        ...memory.meta,
+        id: newKey,
+      },
+    }
+    await this._kv.set(newKey, updated)
     await this._kv.delete(oldKey)
   }
 }

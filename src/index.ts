@@ -6,7 +6,7 @@
  */
 
 import type { AppServerContext } from "./type";
-import { addMemoryController, loginController, getMemoryController } from "./controller";
+import { addMemoryController, loginController, getMemoryController, updateMemoryController, updateMemoryKeyController } from "./controller";
 import { SessionService, KVMemoryService } from "./service";
 
 const context: AppServerContext = {
@@ -23,11 +23,10 @@ const server = Bun.serve({
       POST: (req) => addMemoryController(req, context),
     },
     "/update_memory": {
-      POST: () => new Response(),
+      POST: (req) => updateMemoryController(req, context),
     },
     "/update_memory_key": {
-      POST: () => new Response(),
+      POST: (req) => updateMemoryKeyController(req, context),
     },
   }
 });
-

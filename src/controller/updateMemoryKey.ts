@@ -1,21 +1,21 @@
 /**
- * 更新记忆控制器
+ * 更新记忆key控制器
  * @author aokihu <aokihu@gmail.com>
  * @license MIT
- * @description RequestBody.value 使用 Partial<MemoryNoMeta>，关键词和链接可选
+ * @description 记忆key重命名
  */
 import { z } from 'zod'
-import { AppServerContext, MemoryNoMeta, MemoryNoMetaSchema } from '../type'
+import { AppServerContext } from '../type'
 
 const RequestBodySchema = z.object({
     session: z.string(),
-    key: z.string(),
-    value: MemoryNoMetaSchema.partial(),
+    old_key: z.string(),
+    new_key: z.string(),
 })
 
 type RequestBody = z.infer<typeof RequestBodySchema>
 
-export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory">, ctx: AppServerContext) => {
+export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_memory_key">, ctx: AppServerContext) => {
     let body: RequestBody;
     try {
         body = await req.json();
@@ -30,7 +30,7 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
         return Response.json({ success: false, message: result.error.issues }, { status: 400 });
     }
 
-    const { key, session, value } = result.data;
+    const { session, old_key, new_key } = result.data;
 
     // 验证session
     const sessionData = await ctx.sessionService.getSession(session);
@@ -41,9 +41,16 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
         });
     }
 
-    // 检查记忆是否存在
+    if (old_key === new_key) {
+        return Response.json({
+            success: false,
+            message: "old_key and new_key must be different",
+        });
+    }
+
+    // 检查旧key是否存在
     try {
-        await ctx.kvMemoryService.getMemory(key);
+        await ctx.kvMemoryService.getMemory(old_key);
     } catch (error) {
         const message = error instanceof Error ? error.message : "unknown error";
         if (message.includes("not found")) {
@@ -55,13 +62,27 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
         throw error;
     }
 
-    // 更新记忆
-    await ctx.kvMemoryService.updateMemory(key, value as Partial<MemoryNoMeta>);
+    // 检查新key是否存在
+    try {
+        await ctx.kvMemoryService.getMemory(new_key);
+        return Response.json({
+            success: false,
+            message: "key already exists",
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        if (!message.includes("not found")) {
+            throw error;
+        }
+    }
+
+    await ctx.kvMemoryService.updateKey(old_key, new_key);
 
     return Response.json({
         success: true,
         data: {
-            key,
+            old_key,
+            new_key,
         },
     });
 }

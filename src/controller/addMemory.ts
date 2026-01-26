@@ -4,7 +4,7 @@
  * @param arg {MemoryNoMeta} 记忆的value
  * @description
  */
-import z from 'zod'
+import { z } from 'zod'
 import { MemoryNoMetaSchema } from '../type'
 import type { MemoryNoMeta, AppServerContext } from "../type";
 

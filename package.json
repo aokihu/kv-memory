@@ -2,10 +2,11 @@
   "name": "kvdb-mem",
   "module": "index.ts",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch ./src/index.ts"
+    "dev": "bun run --watch ./src/index.ts",
+    "mcp": "bun run ./src/mcp.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -17,6 +18,8 @@
     "@keyv/sqlite": "^4.0.6",
     "@toon-format/toon": "^2.1.0",
     "effect": "^3.19.14",
-    "keyv": "^5.5.5"
+    "fastmcp": "^0.7.0",
+    "keyv": "^5.5.5",
+    "zod": "^3.24.2"
   }
 }

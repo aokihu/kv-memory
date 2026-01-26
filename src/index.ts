@@ -14,7 +14,7 @@ const context: AppServerContext = {
   kvMemoryService: new KVMemoryService(),
 }
 
-const server = Bun.serve({
+export const server = Bun.serve({
   port: 3000,
   routes: {
     "/login": (req) => loginController(req, context),
@@ -30,3 +30,4 @@ const server = Bun.serve({
     },
   }
 });
+

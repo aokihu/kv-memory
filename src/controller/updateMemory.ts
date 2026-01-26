@@ -42,17 +42,12 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
     }
 
     // 检查记忆是否存在
-    try {
-        await ctx.kvMemoryService.getMemory(key);
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        if (message.includes("not found")) {
-            return Response.json({
-                success: false,
-                message: "memory not found",
-            });
-        }
-        throw error;
+    const existingMemory = await ctx.kvMemoryService.getMemory(key);
+    if (!existingMemory) {
+        return Response.json({
+            success: false,
+            message: "memory not found",
+        });
     }
 
     // 更新记忆

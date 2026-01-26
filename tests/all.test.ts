@@ -1,8 +1,8 @@
 import { describe, test, beforeAll, afterAll, expect } from 'bun:test'
+import {server} from '../src'
 
 describe("记忆系统测试用例", () => {
 
-    const API_URL = "http://localhost:3000";
     const BASE_MEMORY_KEY = "test_key";
     const RENAME_OLD_KEY = "rename_old_key";
     const RENAME_NEW_KEY = "rename_new_key";
@@ -11,12 +11,12 @@ describe("记忆系统测试用例", () => {
     let sessionId: string;
 
     afterAll(async () => {
-        // await Bun.file("kv.db").exists() && await Bun.file("kv.db").delete()
+        await Bun.file("kv.db").exists() && await Bun.file("kv.db").delete()
     })
 
     test("获取Session", async () => {
 
-        const res = await fetch(`${API_URL}/login`, {
+        const res = await fetch(`${server.url}/login`, {
             method: "GET",
         })
 
@@ -34,7 +34,7 @@ describe("记忆系统测试用例", () => {
 
     test("添加记忆", async () => {
 
-        const res = await fetch(`${API_URL}/add_memory`, {
+        const res = await fetch(`${server.url}/add_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -53,12 +53,15 @@ describe("记忆系统测试用例", () => {
         expect(res.status).toBe(200);
         const payload = await res.json()
         expect(payload).toHaveProperty("success");
+        if (payload.success === false) {
+            console.log(payload.message)
+        }
         expect(payload.success).toBe(true);
     })
 
 
     test("读取记忆", async () => {
-        const res = await fetch(`${API_URL}/get_memory`, {
+        const res = await fetch(`${server.url}/get_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -85,7 +88,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("更新记忆内容", async () => {
-        const res = await fetch(`${API_URL}/update_memory`, {
+        const res = await fetch(`${server.url}/update_memory`, {    
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -107,7 +110,7 @@ describe("记忆系统测试用例", () => {
         expect(payload).toHaveProperty("data");
         expect(payload.data.key).toBe(BASE_MEMORY_KEY);
 
-        const getRes = await fetch(`${API_URL}/get_memory`, {
+        const getRes = await fetch(`${server.url}/get_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -129,7 +132,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("部分更新记忆内容", async () => {
-        const res = await fetch(`${API_URL}/update_memory`, {
+        const res = await fetch(`${server.url}/update_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -148,7 +151,7 @@ describe("记忆系统测试用例", () => {
         expect(payload).toHaveProperty("success");
         expect(payload.success).toBe(true);
 
-        const getRes = await fetch(`${API_URL}/get_memory`, {
+        const getRes = await fetch(`${server.url}/get_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -170,7 +173,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("更新记忆内容 - 无效Session", async () => {
-        const res = await fetch(`${API_URL}/update_memory`, {
+        const res = await fetch(`${server.url}/update_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -193,7 +196,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("更新记忆内容 - 记忆不存在", async () => {
-        const res = await fetch(`${API_URL}/update_memory`, {
+        const res = await fetch(`${server.url}/update_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -216,7 +219,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("添加记忆(用于重命名)", async () => {
-        const res = await fetch(`${API_URL}/add_memory`, {
+        const res = await fetch(`${server.url}/add_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -240,7 +243,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("添加记忆(用于重名冲突)", async () => {
-        const res = await fetch(`${API_URL}/add_memory`, {
+        const res = await fetch(`${server.url}/add_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -264,7 +267,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("添加记忆(用于重命名冲突源)", async () => {
-        const res = await fetch(`${API_URL}/add_memory`, {
+        const res = await fetch(`${server.url}/add_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -288,7 +291,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("重命名记忆键", async () => {
-        const res = await fetch(`${API_URL}/update_memory_key`, {
+        const res = await fetch(`${server.url}/update_memory_key`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -307,7 +310,7 @@ describe("记忆系统测试用例", () => {
         expect(payload.data.old_key).toBe(RENAME_OLD_KEY);
         expect(payload.data.new_key).toBe(RENAME_NEW_KEY);
 
-        const getRes = await fetch(`${API_URL}/get_memory`, {
+        const getRes = await fetch(`${server.url}/get_memory`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -322,12 +325,13 @@ describe("记忆系统测试用例", () => {
         const getPayload = await getRes.json()
         expect(getPayload).toHaveProperty("success");
         expect(getPayload.success).toBe(true);
-        expect(getPayload.data.meta.id).toBe(RENAME_NEW_KEY);
+        expect(getPayload.data.summary).toBe("rename_summary");
+        expect(getPayload.data.text).toBe("rename_text");
     })
 
 
     test("重命名记忆键 - 无效Session", async () => {
-        const res = await fetch(`${API_URL}/update_memory_key`, {
+        const res = await fetch(`${server.url}/update_memory_key`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -348,7 +352,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("重命名记忆键 - 旧键不存在", async () => {
-        const res = await fetch(`${API_URL}/update_memory_key`, {
+        const res = await fetch(`${server.url}/update_memory_key`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -369,7 +373,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("重命名记忆键 - 新键已存在", async () => {
-        const res = await fetch(`${API_URL}/update_memory_key`, {
+        const res = await fetch(`${server.url}/update_memory_key`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -390,7 +394,7 @@ describe("记忆系统测试用例", () => {
 
 
     test("重命名记忆键 - 新旧键相同", async () => {
-        const res = await fetch(`${API_URL}/update_memory_key`, {
+        const res = await fetch(`${server.url}/update_memory_key`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

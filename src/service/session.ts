@@ -5,14 +5,13 @@
  */
 
 import { Keyv } from "keyv";
-import { KeyvSqlite } from '@keyv/sqlite'
 import type { SessionValue } from "../type";
 
 export class SessionService {
   private sessionKeyv;
 
   constructor() {
-    this.sessionKeyv =  new Keyv<SessionValue>(new KeyvSqlite({uri: "sqlite://session.db"}),{ ttl: 180000 });
+    this.sessionKeyv =  new Keyv<SessionValue>({ ttl: 180000 });
   }
 
   /**

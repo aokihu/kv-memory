@@ -5,7 +5,7 @@
  * @description 这里用户登陆不做身份验证,只获取session即可
  */
 
-import { AppServerContext } from "../type";
+import { type AppServerContext } from "../type";
 
 
 export const loginController = async (req: Bun.BunRequest, ctx: AppServerContext) => {

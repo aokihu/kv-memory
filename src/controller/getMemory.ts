@@ -5,7 +5,7 @@
  * @summary 获取记忆,并且更新记忆的meta数据
  */
 import { z } from 'zod'
-import { AppServerContext } from "../type"
+import { type AppServerContext } from "../type"
 
 /* 类型定义 */
 const RequestBodySchema = z.object({
@@ -21,7 +21,7 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
 
     let body: RequestBody;
     try {
-        body = await req.json();
+        body = await req.json() as RequestBody;
     } catch {
         return Response.json({ success: false, message: "invalid json" }, { status: 400 });
     }

@@ -25,6 +25,12 @@ export class KVMemoryService {
     await KVMemory.getInstance().add(key, arg)
   }
 
+  /**
+   * 获取记忆
+   * @param key 记忆的key
+   * @returns 记忆的value
+   * @description 增加访问次数和最后访问时间
+   */
   async getMemory(key: string): Promise<MemoryNoMetaWithLinkSummary | undefined> {
     const value = await KVMemory.getInstance().get(key);
     if (!value) {
@@ -50,7 +56,7 @@ export class KVMemoryService {
     try {
       const links = await Promise.all(
         memory.links.map(async (link) => {
-          const linkedValue = await KVMemory.getInstance().get(link.key);
+          const linkedValue = await KVMemory.getInstance().get(link.key! as string);
           if (!linkedValue) {
             return {
               ...link,

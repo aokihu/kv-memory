@@ -49,31 +49,21 @@ export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_mem
     }
 
     // 检查旧key是否存在
-    try {
-        await ctx.kvMemoryService.getMemory(old_key);
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        if (message.includes("not found")) {
-            return Response.json({
-                success: false,
-                message: "memory not found",
-            });
-        }
-        throw error;
+    const oldMemory = await ctx.kvMemoryService.getMemory(old_key);
+    if (!oldMemory) {
+        return Response.json({
+            success: false,
+            message: "memory not found",
+        });
     }
 
     // 检查新key是否存在
-    try {
-        await ctx.kvMemoryService.getMemory(new_key);
+    const newMemory = await ctx.kvMemoryService.getMemory(new_key);
+    if (newMemory) {
         return Response.json({
             success: false,
             message: "key already exists",
         });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        if (!message.includes("not found")) {
-            throw error;
-        }
     }
 
     await ctx.kvMemoryService.updateKey(old_key, new_key);

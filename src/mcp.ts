@@ -24,7 +24,7 @@ const server = new FastMCP<McpSessionData>({
   name: "kvdb-mem",
   version: "0.1.0",
   instructions:
-    "KVDB memory MCP server. Use session_new to create a session and memory_add/memory_get to manage memories.",
+    "KVDB memory MCP server. Use session_new to create a session and memory_add/memory_get/memory_update/memory_rename to manage memories.",
 });
 
 const MemoryValueSchema = MemoryNoMetaSchema.extend({
@@ -39,6 +39,18 @@ const MemoryAddSchema = z.object({
 
 const MemoryGetSchema = z.object({
   key: z.string().min(1),
+  session: z.string().min(1).optional(),
+});
+
+const MemoryUpdateSchema = z.object({
+  key: z.string().min(1),
+  value: MemoryNoMetaSchema.partial(),
+  session: z.string().min(1).optional(),
+});
+
+const MemoryRenameSchema = z.object({
+  old_key: z.string().min(1),
+  new_key: z.string().min(1),
   session: z.string().min(1).optional(),
 });
 
@@ -133,6 +145,92 @@ server.addTool({
           session_refreshed: refreshed,
           data: memory,
         },
+        null,
+        2,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      return JSON.stringify({ success: false, message }, null, 2);
+    }
+  },
+});
+
+server.addTool({
+  name: "memory_update",
+  description: "Update a memory record",
+  parameters: MemoryUpdateSchema,
+  execute: async (args, context) => {
+    try {
+      const { refreshed } = await resolveSession(args.session, context);
+
+      if (args.session && refreshed) {
+        return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
+      }
+
+      try {
+        await kvMemoryService.getMemory(args.key);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        if (message.includes("not found")) {
+          return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
+        }
+        throw error;
+      }
+
+      await kvMemoryService.updateMemory(args.key, args.value);
+
+      return JSON.stringify({ success: true, key: args.key }, null, 2);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown error";
+      return JSON.stringify({ success: false, message }, null, 2);
+    }
+  },
+});
+
+server.addTool({
+  name: "memory_rename",
+  description: "Rename a memory key",
+  parameters: MemoryRenameSchema,
+  execute: async (args, context) => {
+    try {
+      const { refreshed } = await resolveSession(args.session, context);
+
+      if (args.session && refreshed) {
+        return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
+      }
+
+      if (args.old_key === args.new_key) {
+        return JSON.stringify(
+          { success: false, message: "old_key and new_key must be different" },
+          null,
+          2,
+        );
+      }
+
+      try {
+        await kvMemoryService.getMemory(args.old_key);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        if (message.includes("not found")) {
+          return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
+        }
+        throw error;
+      }
+
+      try {
+        await kvMemoryService.getMemory(args.new_key);
+        return JSON.stringify({ success: false, message: "key already exists" }, null, 2);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown error";
+        if (!message.includes("not found")) {
+          throw error;
+        }
+      }
+
+      await kvMemoryService.updateKey(args.old_key, args.new_key);
+
+      return JSON.stringify(
+        { success: true, old_key: args.old_key, new_key: args.new_key },
         null,
         2,
       );
@@ -240,7 +338,7 @@ export const startMcpServer = async () => {
   const transport = (Bun.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
   const port = Number(Bun.env.MCP_PORT ?? "8787");
   const host = Bun.env.MCP_HOST;
-  const endpoint = Bun.env.MCP_ENDPOINT ?? "/mcp";
+  const endpoint = (Bun.env.MCP_ENDPOINT ?? "/mcp") as `/${string}`;
 
   if (transport === "httpstream" || transport === "http" || transport === "sse") {
     await server.start({

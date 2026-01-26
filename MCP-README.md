@@ -136,6 +136,51 @@
   2. 每次调用都更新 `Session` 为当前 `key`。
 - **返回**：含 `success`, `session`, `session_refreshed`, `data` 字段的 JSON；`data` 包含完整的 `Memory` 体（含 meta）。
 
+### `memory_update`
+
+- **用途**：局部更新指定记忆的内容，支持只变更 `summary`/`text` 等字段。
+- **参数**：
+
+  ```json
+  {
+    "key": "project_design",
+    "value": {
+      "summary": "Updated project design summary",
+      "text": "Updated detailed design description"
+    },
+    "session": "session_123"
+  }
+  ```
+
+- **行为**：
+  1. 验证 `session` 有效性，失败时返回 `success: false` 及提示。
+  2. 确认目标 `key` 对应记忆存在。
+  3. 使用 `MemoryNoMetaSchema.partial()` 做局部更新，并写回 KV 层。
+  4. 返回 `{ "success": true, "key": "project_design" }`。
+- **返回**：`{ "success": true, "key": "project_design" }`，失败时包含 `message`。
+
+### `memory_rename`
+
+- **用途**：在不丢失记忆内容的前提下更换 `key`，便于整理与归档。
+- **参数**：
+
+  ```json
+  {
+    "old_key": "old_design",
+    "new_key": "new_design",
+    "session": "session_123"
+  }
+  ```
+
+- **行为**：
+  1. 校验 `session`（若提供），确保会话尚可用。
+  2. 验证 `old_key` 与 `new_key` 不相同。
+  3. 确保 `old_key` 已存在并可读。
+  4. 确保 `new_key` 目前不存在，避免覆盖。
+  5. 在 KV 层完成重命名并返回成功状态。
+
+  - **返回**：`{ "success": true, "old_key": "old_design", "new_key": "new_design" }`
+
 ## 可用资源
 
 ### `memory://{key}`
@@ -201,6 +246,9 @@ cat <<'EOF' >/tmp/mcp.cmd
 { "tool": "session_new", "arguments": {} }
 { "tool": "memory_add", "arguments": { "key": "note/intro", "value": { "domain": "product", "summary": "记录 MCP 说明", "text": "...", "type": "note" } } }
 { "tool": "memory_get", "arguments": { "key": "note/intro" } }
+{ "tool": "memory_update", "arguments": { "key": "note/intro", "value": { "summary": "调整后的简介", "text": "补充了更多背景" } } }
+{ "tool": "memory_rename", "arguments": { "old_key": "note/intro", "new_key": "note/mcp_intro" } }
+{ "tool": "memory_get", "arguments": { "key": "note/mcp_intro" } }
 EOF
 
 # 通过管道/脚本发送给 STDIO 服务
@@ -239,3 +287,5 @@ await client.disconnect();
 - **HTTP 连接报 `ECONNREFUSED`**：检查 `MCP_TRANSPORT`、`MCP_PORT` 与 `MCP_ENDPOINT` 是否与客户端一致；若绑定到 `127.0.0.1`，外部无法访问。
 - **Session 失效**：STDIO 模式下保持进程不重启，`session_new` 结果会缓存到全局 `stdioSession`；HTTP 模式建议每次调用后保存响应中的 `session` 字段。
 - **资源 `memory://{key}` 返回 `success: false`**：确认记忆已写入并拼写一致；服务端会将错误文本放在 `message` 字段。
+- **`memory_update` 失败**：常见原因包括提供了无效 `session`、指定 `key` 不存在或传入空的 `value`；检查返回的 `message` 获取详细提示。
+- **`memory_rename` 失败**：`old_key` 必须存在且不同于 `new_key`，`new_key` 不可已存在；命令会在冲突时返回 `success: false` 并说明哪个检查没有通过。

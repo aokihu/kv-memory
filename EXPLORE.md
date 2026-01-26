@@ -23,10 +23,10 @@
     <File path="/src/index.ts" desc="Bun.serve server wiring, route map, and AppServerContext assembly" />
     <File path="/src/type.ts" desc="Zod schema definitions for Memory, metadata, links, and context payloads" />
     <File path="/src/db.ts" desc="Placeholder for future database wiring (currently empty)" />
-    <File path="/src/mcp.ts" desc="MCP server entrypoint that wires the long-running coordination service" />
+    <File path="/src/mcp.ts" desc="MCP server entrypoint that wires the long-running coordination service and exposes session_new plus memory_add, memory_get, memory_update, and memory_rename tools" />
     <Dir path="/src/session" desc="Session helpers directory (empty for now)" />
     <Dir path="/tests" desc="Bun test suite that hits the memory API flow" />
-    <File path="/test-mcp.js" desc="Standalone script for exercising MCP server flows" />
+    <File path="/test-mcp.js" desc="Standalone script for exercising all five MCP tools (session_new, memory_add, memory_get, memory_update, memory_rename)" />
     <File path="/tests/all.test.ts" desc="API flow tests for login, add, and get memory endpoints" />
     <Dir path="/node_modules" desc="Installed Bun dependencies" />
     <Dir path="/scripts" desc="Automation helpers (currently empty)" />

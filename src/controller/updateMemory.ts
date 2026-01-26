@@ -5,7 +5,7 @@
  * @description RequestBody.value 使用 Partial<MemoryNoMeta>，关键词和链接可选
  */
 import { z } from 'zod'
-import { AppServerContext, MemoryNoMeta, MemoryNoMetaSchema } from '../type'
+import { type AppServerContext, type MemoryNoMeta, MemoryNoMetaSchema } from '../type'
 
 const RequestBodySchema = z.object({
     session: z.string(),
@@ -18,7 +18,7 @@ type RequestBody = z.infer<typeof RequestBodySchema>
 export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory">, ctx: AppServerContext) => {
     let body: RequestBody;
     try {
-        body = await req.json();
+        body = await req.json() as RequestBody;
     } catch {
         return Response.json({ success: false, message: "invalid json" }, { status: 400 });
     }

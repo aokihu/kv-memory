@@ -5,7 +5,7 @@
  * @description 记忆key重命名
  */
 import { z } from 'zod'
-import { AppServerContext } from '../type'
+import { type AppServerContext } from '../type'
 
 const RequestBodySchema = z.object({
     session: z.string(),
@@ -18,7 +18,7 @@ type RequestBody = z.infer<typeof RequestBodySchema>
 export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_memory_key">, ctx: AppServerContext) => {
     let body: RequestBody;
     try {
-        body = await req.json();
+        body = await req.json() as RequestBody;
     } catch {
         return Response.json({ success: false, message: "invalid json" }, { status: 400 });
     }

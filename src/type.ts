@@ -15,6 +15,7 @@ export const MemoryLinkTypeEnums = z.enum(["decision", "constrained", "bug", "de
 
 export const MemoryLink = z.object({
   type: MemoryLinkTypeEnums,
+  key: z.string(),
   term: z.string(),
   weight: z.number().min(0).max(1).default(0.5)
 })

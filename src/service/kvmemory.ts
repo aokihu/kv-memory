@@ -10,6 +10,14 @@ import {
   type MemoryNoMeta,
 } from '../type'
 
+export type MemoryLinkWithSummary = Memory['links'][number] & {
+  summary: string;
+}
+
+export type MemoryNoMetaWithLinkSummary = Omit<Memory, 'meta' | 'links'> & {
+  links: MemoryLinkWithSummary[];
+}
+
 
 export class KVMemoryService {
 
@@ -17,11 +25,10 @@ export class KVMemoryService {
     await KVMemory.getInstance().add(key, arg)
   }
 
-  async getMemory(key: string): Promise<Memory | undefined> {
-    console.log("Get Memory Key,", key)
+  async getMemory(key: string): Promise<MemoryNoMetaWithLinkSummary | undefined> {
     const value = await KVMemory.getInstance().get(key);
     if (!value) {
-      throw new Error(`KVMemory: get: key ${key} not found`)
+      return undefined
     }
 
     const memory = value as Memory
@@ -31,9 +38,46 @@ export class KVMemoryService {
     meta.last_accessed_at = Date.now();
     await KVMemory.getInstance().setMeta(key, meta)
 
-    return {
-      ...memory,
-      meta,
+    const { meta: _meta, ...baseMemory } = memory
+
+    if (!memory.links || memory.links.length === 0) {
+      return {
+        ...baseMemory,
+        links: [],
+      }
+    }
+
+    try {
+      const links = await Promise.all(
+        memory.links.map(async (link) => {
+          const linkedValue = await KVMemory.getInstance().get(link.key);
+          if (!linkedValue) {
+            return {
+              ...link,
+              summary: '关联记忆不存在',
+            }
+          }
+
+          const linkedMemory = linkedValue as Memory
+          return {
+            ...link,
+            summary: linkedMemory.summary ?? '关联记忆不存在',
+          }
+        })
+      )
+
+      return {
+        ...baseMemory,
+        links,
+      }
+    } catch {
+      return {
+        ...baseMemory,
+        links: memory.links.map((link) => ({
+          ...link,
+          summary: '关联记忆不存在',
+        })),
+      }
     }
   }
 

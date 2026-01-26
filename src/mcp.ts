@@ -7,6 +7,7 @@
 import { FastMCP } from "fastmcp";
 import { z } from "zod";
 import { KVMemoryService, SessionService } from "./service";
+import type { MemoryNoMetaWithLinkSummary } from "./service/kvmemory";
 import {
   MemoryNoMetaSchema,
   type MemoryNoMeta,
@@ -27,8 +28,12 @@ const server = new FastMCP<McpSessionData>({
     "KVDB memory MCP server. Use session_new to create a session and memory_add/memory_get/memory_update/memory_rename to manage memories.",
 });
 
+const MemoryLinkInputSchema = MemoryNoMetaSchema.shape.links.element.extend({
+  key: z.string().optional(),
+});
+
 const MemoryValueSchema = MemoryNoMetaSchema.extend({
-  links: MemoryNoMetaSchema.shape.links.optional(),
+  links: z.array(MemoryLinkInputSchema).optional(),
   keywords: MemoryNoMetaSchema.shape.keywords.optional(),
 });
 
@@ -132,7 +137,8 @@ server.addTool({
         await kvMemoryService.traverseMemory(sessionData.last_memory_key);
       }
 
-      const memory = await kvMemoryService.getMemory(args.key);
+      const memory: MemoryNoMetaWithLinkSummary | undefined =
+        await kvMemoryService.getMemory(args.key);
 
       await sessionService.setSession(sessionKey, {
         last_memory_key: args.key,
@@ -255,7 +261,8 @@ server.addResourceTemplate({
   ],
   load: async (args) => {
     try {
-      const memory = await kvMemoryService.getMemory(args.key);
+      const memory: MemoryNoMetaWithLinkSummary | undefined =
+        await kvMemoryService.getMemory(args.key);
       return {
         uri: `memory://${args.key}`,
         text: JSON.stringify(memory, null, 2),

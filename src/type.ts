@@ -62,6 +62,10 @@ export type AppServerContext = {
 
 /* ---- Session ---- */
 
-export type SessionValue = {
-  last_memory_key: string; // 最后访问的记忆key
-}
+
+export const SessionValueSchema = z.object({
+  kv_namespace: z.string().describe("会话的kv namespace"),
+  last_memory_key: z.string().describe("最后访问的记忆key"),
+})
+
+export type SessionValue = z.infer<typeof SessionValueSchema>

@@ -13,12 +13,15 @@ import {
 } from "../../type";
 import { KeyvSqlite } from '@keyv/sqlite'
 
+const URI = 'sqlite://kv.db'
+const NAMESPACE = "mem";
+
 export class KVMemory {
   static instance: KVMemory;
   private _kv: Keyv<Memory>;
 
   constructor() {
-    this._kv = new Keyv<Memory>(new KeyvSqlite({ uri: 'sqlite://kv.db' }), { ttl: 180000 })
+    this._kv = new Keyv<Memory>(new KeyvSqlite({ uri: URI }), { namespace: NAMESPACE })
   }
 
   static getInstance(): KVMemory {

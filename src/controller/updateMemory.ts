@@ -31,6 +31,7 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
     }
 
     const { key, session, value } = result.data;
+    
 
     // 验证session
     const sessionData = await ctx.sessionService.getSession(session);
@@ -41,8 +42,12 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
         });
     }
 
+    const ns = sessionData.kv_namespace;
+    console.log('Session Data', sessionData)
+    console.log("Update memory:", ns, key, value)
+
     // 检查记忆是否存在
-    const existingMemory = await ctx.kvMemoryService.getMemory(key);
+    const existingMemory = await ctx.kvMemoryService.getMemory(ns, key);
     if (!existingMemory) {
         return Response.json({
             success: false,
@@ -51,7 +56,7 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
     }
 
     // 更新记忆
-    await ctx.kvMemoryService.updateMemory(key, value as Partial<MemoryNoMeta>);
+    await ctx.kvMemoryService.updateMemory(ns, key, value as Partial<MemoryNoMeta>);
 
     return Response.json({
         success: true,

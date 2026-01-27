@@ -17,7 +17,10 @@ describe("记忆系统测试用例", () => {
     test("获取Session", async () => {
 
         const res = await fetch(`${server.url}/login`, {
-            method: "GET",
+            method: "POST",
+            body: JSON.stringify({
+                namespace:'test'
+            })
         })
 
         expect(res.status).toBe(200);
@@ -40,6 +43,7 @@ describe("记忆系统测试用例", () => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                session: sessionId,
                 key: BASE_MEMORY_KEY,
                 value: {
                     summary: "test_summary",
@@ -75,7 +79,6 @@ describe("记忆系统测试用例", () => {
         expect(res.status).toBe(200);
         const payload = await res.json()
 
-        console.log(payload)
         expect(payload).toHaveProperty("success");
         expect(payload.success).toBe(true);
         expect(payload).toHaveProperty("data");
@@ -105,6 +108,7 @@ describe("记忆系统测试用例", () => {
 
         expect(res.status).toBe(200);
         const payload = await res.json()
+        console.log(payload)
         expect(payload).toHaveProperty("success");
         expect(payload.success).toBe(true);
         expect(payload).toHaveProperty("data");
@@ -225,6 +229,7 @@ describe("记忆系统测试用例", () => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                session: sessionId,
                 key: RENAME_OLD_KEY,
                 value: {
                     summary: "rename_summary",
@@ -249,6 +254,7 @@ describe("记忆系统测试用例", () => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                session: sessionId,
                 key: RENAME_EXISTING_KEY,
                 value: {
                     summary: "rename_conflict_summary",
@@ -273,6 +279,7 @@ describe("记忆系统测试用例", () => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
+                session: sessionId,
                 key: RENAME_CONFLICT_SOURCE_KEY,
                 value: {
                     summary: "rename_conflict_source_summary",

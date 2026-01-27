@@ -46,14 +46,15 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
 
     // 从session中获取用户之前访问的记忆key
     const lastMemoryKey = sessionData.last_memory_key;
+    const ns = sessionData.kv_namespace;
 
     if (lastMemoryKey !== '') {
         // 更新上一次访问的记忆连接记录
-        await ctx.kvMemoryService.traverseMemory(lastMemoryKey);
+        await ctx.kvMemoryService.traverseMemory(ns, lastMemoryKey);
     }
 
     // 从KVDB中获取内存
-    const memory = await ctx.kvMemoryService.getMemory(key);
+    const memory = await ctx.kvMemoryService.getMemory(ns, key);
     if (!memory) {
         return Response.json({
             success: false,

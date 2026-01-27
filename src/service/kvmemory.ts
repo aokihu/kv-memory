@@ -19,20 +19,45 @@ export type MemoryNoMetaWithLinkSummary = Omit<Memory, 'meta' | 'links'> & {
 }
 
 
-export class KVMemoryService {
+export class KVMemoryService { 
+  private _kvCollect: Map<string, KVMemory> = new Map();
 
-  async addMemory(key: string, arg: MemoryNoMeta ) {
-    await KVMemory.getInstance().add(key, arg)
+  constructor() {
+    this._kvCollect.set('mem', new KVMemory('mem')); // 初始化时候创建一个默认的记忆命名空间
+  }
+
+  addKVMemory(namespace: string) {
+    this._kvCollect.set(namespace, new KVMemory(namespace));
+  }
+
+  /**
+   * 添加记忆
+   * @param namespace 记忆命名空间
+   * @param key 记忆的key
+   * @param arg 记忆的value
+   * @description 增加访问次数和最后访问时间
+   */
+  async addMemory(namespace: string, key: string, arg: MemoryNoMeta ) {
+    if(!this._kvCollect.has(namespace)) {
+      this.addKVMemory(namespace);
+    }
+
+    await this._kvCollect.get(namespace)?.add(key, arg)
   }
 
   /**
    * 获取记忆
+   * @param namespace 记忆命名空间
    * @param key 记忆的key
    * @returns 记忆的value
    * @description 增加访问次数和最后访问时间
    */
-  async getMemory(key: string): Promise<MemoryNoMetaWithLinkSummary | undefined> {
-    const value = await KVMemory.getInstance().get(key);
+  async getMemory(namespace: string, key: string): Promise<MemoryNoMetaWithLinkSummary | undefined> {
+    const kv = this._kvCollect.get(namespace);
+    if (!kv) {
+      return undefined
+    }
+    const value = await kv.get(key);
     if (!value) {
       return undefined
     }
@@ -42,7 +67,7 @@ export class KVMemoryService {
 
     meta.access_count += 1;
     meta.last_accessed_at = Date.now();
-    await KVMemory.getInstance().setMeta(key, meta)
+    await kv.setMeta(key, meta)
 
     const { meta: _meta, ...baseMemory } = memory
 
@@ -56,7 +81,7 @@ export class KVMemoryService {
     try {
       const links = await Promise.all(
         memory.links.map(async (link) => {
-          const linkedValue = await KVMemory.getInstance().get(link.key! as string);
+          const linkedValue = await kv.get(link.key! as string);
           if (!linkedValue) {
             return {
               ...link,
@@ -89,25 +114,38 @@ export class KVMemoryService {
 
   /**
    * 更新记忆
+   * @param namespace 记忆命名空间
    * @param key 记忆的key
    * @param arg 记忆的value
    * @description 用户手动更新记忆内容
    */
-  async updateMemory(key: string, arg: Partial<MemoryNoMeta>) {
-    await KVMemory.getInstance().update(key, arg)
+  async updateMemory(namespace: string, key: string, arg: Partial<MemoryNoMeta>) {
+    await this._kvCollect.get(namespace)?.update(key, arg)
   }
 
   /**
    * 更新记忆的key
+   * @param namespace 记忆命名空间
    * @param oldKey 旧的记忆key
    * @param newKey 新的记忆key
    */
-  async updateKey(oldKey: string, newKey: string) {
-    await KVMemory.getInstance().updateKey(oldKey, newKey)
+  async updateKey(namespace: string, oldKey: string, newKey: string) {
+    await this._kvCollect.get(namespace)?.updateKey(oldKey, newKey)
   }
 
-  async traverseMemory(key: string): Promise<Memory | undefined> {
-    const value = await KVMemory.getInstance().get(key);
+  /**
+   * 遍历记忆
+   * @param namespace 记忆命名空间
+   * @param key 记忆的key
+   * @returns 记忆的value
+   * @description 增加遍历次数和最后遍历时间
+   */
+  async traverseMemory(namespace: string, key: string): Promise<Memory | undefined> {
+    const kv = this._kvCollect.get(namespace);
+    if (!kv) {
+      return undefined
+    }
+    const value = await kv.get(key);
     if (!value) {
       // throw new Error(`KVMemory: traverse: key ${key} not found`)
       return undefined
@@ -118,7 +156,7 @@ export class KVMemoryService {
 
     meta.traverse_count += 1;
     meta.last_linked_at = Date.now();
-    await KVMemory.getInstance().setMeta(key, meta)
+    await kv.setMeta(key, meta)
 
     return {
       ...memory,

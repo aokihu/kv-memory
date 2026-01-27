@@ -17,18 +17,10 @@ const URI = 'sqlite://kv.db'
 const NAMESPACE = "mem";
 
 export class KVMemory {
-  static instance: KVMemory;
   private _kv: Keyv<Memory>;
 
-  constructor() {
-    this._kv = new Keyv<Memory>(new KeyvSqlite({ uri: URI }), { namespace: NAMESPACE })
-  }
-
-  static getInstance(): KVMemory {
-    if (!KVMemory.instance) {
-      KVMemory.instance = new KVMemory();
-    }
-    return KVMemory.instance;
+  constructor(namespace:string = NAMESPACE) {
+    this._kv = new Keyv<Memory>(new KeyvSqlite({ uri: URI }), { namespace })
   }
 
   async add(key: string, arg: MemoryNoMeta) {

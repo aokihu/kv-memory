@@ -41,6 +41,8 @@ export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_mem
         });
     }
 
+    const ns = sessionData.kv_namespace;
+
     if (old_key === new_key) {
         return Response.json({
             success: false,
@@ -49,7 +51,7 @@ export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_mem
     }
 
     // 检查旧key是否存在
-    const oldMemory = await ctx.kvMemoryService.getMemory(old_key);
+    const oldMemory = await ctx.kvMemoryService.getMemory(ns, old_key);
     if (!oldMemory) {
         return Response.json({
             success: false,
@@ -58,7 +60,7 @@ export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_mem
     }
 
     // 检查新key是否存在
-    const newMemory = await ctx.kvMemoryService.getMemory(new_key);
+    const newMemory = await ctx.kvMemoryService.getMemory(ns, new_key);
     if (newMemory) {
         return Response.json({
             success: false,
@@ -66,7 +68,7 @@ export const updateMemoryKeyController = async (req: Bun.BunRequest<"/update_mem
         });
     }
 
-    await ctx.kvMemoryService.updateKey(old_key, new_key);
+    await ctx.kvMemoryService.updateKey(ns, old_key, new_key);
 
     return Response.json({
         success: true,

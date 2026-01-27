@@ -8,7 +8,7 @@
 import Keyv from "keyv";
 import { type SessionValue, SessionValueSchema } from "../../type";
 
-const NAMESPACE = "session";
+const NAMESPACE = "_session_";
 const TTL = 1000 * 60 * 5; // 5分钟
 
 export class Session {
@@ -32,11 +32,17 @@ export class Session {
     }
 
     async updateSession(sessionId: string, data: Partial<SessionValue>): Promise<void> {
+
+        const origin = await this.getSession(sessionId);
+        if (!origin) {
+            throw new Error("session not found")
+        }
+
         const result = SessionValueSchema.partial().safeParse(data)
         if (!result.success) {
             throw new Error(result.error.message)
         }
-        await this._kv.set(sessionId, result.data);
+        await this._kv.set(sessionId, { ...origin, ...result.data });
     }
 
     async deleteSession(sessionId: string): Promise<void> {

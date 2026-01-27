@@ -23,9 +23,9 @@ const kvMemoryService = new KVMemoryService();
 
 const server = new FastMCP<McpSessionData>({
   name: "kvdb-mem",
-  version: "0.1.0",
+  version: "0.1.1",
   instructions:
-    "KVDB memory MCP server. Use session_new to create a session and memory_add/memory_get/memory_update/memory_rename to manage memories.",
+    "使用Key-Value数据库存储记忆,并通过记忆连接(Link)将各个记忆连接起来,模仿人类的记忆连接方式.",
 });
 
 const MemoryLinkInputSchema = MemoryNoMetaSchema.shape.links.element.extend({
@@ -90,13 +90,11 @@ const resolveSession = async (
 
 server.addTool({
   name: "session_new",
-  description: "Create a new session key",
+  description: "创建新的session,每个session最多保持3分钟时效",
   parameters: z.object({}),
   execute: async (_args, context) => {
     const sessionKey = await sessionService.generateSession();
-    const sessionStore = getSessionStore(context);
-    sessionStore.sessionKey = sessionKey;
-    return JSON.stringify({ success: true, session: sessionKey }, null, 2);
+    return JSON.stringify(sessionKey);
   },
 });
 
@@ -342,26 +340,20 @@ server.addPrompt({
 export const mcpServer = server;
 
 export const startMcpServer = async () => {
-  const transport = (Bun.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
   const port = Number(Bun.env.MCP_PORT ?? "8787");
   const host = Bun.env.MCP_HOST;
   const endpoint = (Bun.env.MCP_ENDPOINT ?? "/mcp") as `/${string}`;
 
-  if (transport === "httpstream" || transport === "http" || transport === "sse") {
-    await server.start({
-      transportType: "httpStream",
-      httpStream: {
-        port,
-        host,
-        endpoint,
-      },
-    });
-    return;
-  }
-
   await server.start({
-    transportType: "stdio",
+    transportType: "httpStream",
+    httpStream: {
+      port,
+      host,
+      endpoint,
+    },
   });
+
+  return;
 };
 
 if (import.meta.main) {

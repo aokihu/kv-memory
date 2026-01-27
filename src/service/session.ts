@@ -4,7 +4,6 @@
  * @license MIT
  */
 
-import { Keyv } from "keyv";
 import { Session } from '../libs/session'
 import type { SessionValue } from "../type";
 

@@ -1,0 +1,1 @@
+export { createMemoryResourceTemplate } from "./memoryResource";

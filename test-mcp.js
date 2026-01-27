@@ -3,7 +3,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const rootDir = process.cwd();
-const mcpPath = path.join(rootDir, "src", "mcp.ts");
+const mcpPath = path.join(rootDir, "src", "mcp", "server.ts");
 const pkgPath = path.join(rootDir, "package.json");
 
 const results = [];
@@ -209,9 +209,9 @@ const ensureIncludes = (name, collection, expected) => {
 const run = async () => {
   try {
     await fs.access(mcpPath);
-    record("src/mcp.ts exists", true);
+    record("src/mcp/server.ts exists", true);
   } catch (error) {
-    record("src/mcp.ts exists", false, error?.message ?? "missing file");
+    record("src/mcp/server.ts exists", false, error?.message ?? "missing file");
     summarize();
     return;
   }
@@ -219,9 +219,9 @@ const run = async () => {
   let mcpSource = "";
   try {
     mcpSource = await fs.readFile(mcpPath, "utf8");
-    assertTrue("src/mcp.ts is non-empty", mcpSource.trim().length > 0);
+    assertTrue("src/mcp/server.ts is non-empty", mcpSource.trim().length > 0);
   } catch (error) {
-    record("Read src/mcp.ts", false, error?.message ?? "read failed");
+    record("Read src/mcp/server.ts", false, error?.message ?? "read failed");
     summarize();
     return;
   }
@@ -248,7 +248,7 @@ const run = async () => {
     mcpSource,
     /addResourceTemplate\(\s*{\s*uriTemplate:\s*"([^"]+)"/g,
   );
-  ensureIncludes("MCP resource template", resourceTemplates, ["memory://{key}"]);
+  ensureIncludes("MCP resource template", resourceTemplates, ["memory://{namespace}/{key}"]);
   assertTrue(
     "Resource template metadata",
     mcpSource.includes("name: \"KVDB Memory\"") &&
@@ -263,14 +263,14 @@ const run = async () => {
   ensureIncludes("MCP prompts", promptNames, ["capture_memory", "recall_memory"]);
 
   assertTrue(
-    "stdio transport configured",
-    mcpSource.includes("transportType: \"stdio\""),
-    "No stdio transport found",
+    "httpStream transport configured",
+    mcpSource.includes("transportType: \"httpStream\""),
+    "No httpStream transport found",
   );
 
   assertTrue(
     "MCP API exports",
-    mcpSource.includes("export const mcpServer") &&
+    mcpSource.includes("export const server") &&
       mcpSource.includes("export const startMcpServer"),
     "Missing exported API",
   );
@@ -287,8 +287,8 @@ const run = async () => {
     const scripts = pkg.scripts ?? {};
     assertTrue(
       "MCP script configured",
-      scripts.mcp === "bun run ./src/mcp.ts",
-      `Expected scripts.mcp to be "bun run ./src/mcp.ts"`,
+      scripts.mcp === "bun run ./src/mcp/index.ts",
+      `Expected scripts.mcp to be "bun run ./src/mcp/index.ts"`,
     );
 
     const deps = { ...pkg.dependencies, ...pkg.devDependencies, ...pkg.peerDependencies };
@@ -301,8 +301,8 @@ const run = async () => {
   let mcpServer = null;
   try {
     const mcpModule = await import(pathToFileURL(mcpPath).href);
-    mcpServer = mcpModule?.mcpServer ?? null;
-    assertTrue("MCP server import", Boolean(mcpServer), "mcpServer export not found");
+    mcpServer = mcpModule?.server ?? null;
+    assertTrue("MCP server import", Boolean(mcpServer), "server export not found");
   } catch (error) {
     record("MCP server import", false, error?.message ?? "import failed");
   }

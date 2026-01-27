@@ -1,118 +1,73 @@
 /**
- * MCP server for KVDB memory
+ * MCP server for KVDB memory (HTTP stream only)
  * @author aokihu <aokihu@gmail.com>
  * @license MIT
  */
 
-import { FastMCP } from "fastmcp";
-import { z } from "zod";
-import { KVMemoryService, SessionService } from "./service";
-import type { MemoryNoMetaWithLinkSummary } from "./service/kvmemory";
+import { FastMCP, type Tool, type ToolParameters } from "fastmcp";
+import { KVMemoryService, SessionService } from "../service";
+import type { MemoryNoMetaWithLinkSummary } from "../service/kvmemory";
+import { type MemoryNoMeta } from "../type";
 import {
-  MemoryNoMetaSchema,
-  type MemoryNoMeta,
-  type SessionValue,
-} from "./type";
-
-type McpSessionData = {
-  sessionKey?: string;
-};
+  MemoryAddSchema,
+  MemoryGetSchema,
+  MemoryRenameSchema,
+  MemoryUpdateSchema,
+} from "./schemas/memory";
+import { SessionCreateSchema } from "./schemas/session";
 
 const sessionService = new SessionService();
 const kvMemoryService = new KVMemoryService();
 
-const server = new FastMCP<McpSessionData>({
+export const server = new FastMCP({
   name: "kvdb-mem",
   version: "0.1.1",
   instructions:
     "使用Key-Value数据库存储记忆,并通过记忆连接(Link)将各个记忆连接起来,模仿人类的记忆连接方式.",
 });
 
-const MemoryLinkInputSchema = MemoryNoMetaSchema.shape.links.element.extend({
-  key: z.string().optional(),
-});
+type McpSessionAuth = Record<string, unknown> | undefined;
+type McpToolDefinition = Tool<McpSessionAuth, ToolParameters>;
 
-const MemoryValueSchema = MemoryNoMetaSchema.extend({
-  links: z.array(MemoryLinkInputSchema).optional(),
-  keywords: MemoryNoMetaSchema.shape.keywords.optional(),
-});
-
-const MemoryAddSchema = z.object({
-  key: z.string().min(1),
-  value: MemoryValueSchema,
-});
-
-const MemoryGetSchema = z.object({
-  key: z.string().min(1),
-  session: z.string().min(1).optional(),
-});
-
-const MemoryUpdateSchema = z.object({
-  key: z.string().min(1),
-  value: MemoryNoMetaSchema.partial(),
-  session: z.string().min(1).optional(),
-});
-
-const MemoryRenameSchema = z.object({
-  old_key: z.string().min(1),
-  new_key: z.string().min(1),
-  session: z.string().min(1).optional(),
-});
-
-const stdioSession: McpSessionData = {};
-
-const getSessionStore = (context: { session?: McpSessionData }): McpSessionData => {
-  return context.session ?? stdioSession;
+const toolRegistry = new Map<string, McpToolDefinition>();
+const registerTool = <Params extends ToolParameters>(
+  tool: Tool<McpSessionAuth, Params>,
+) => {
+  toolRegistry.set(tool.name, tool);
+  server.addTool(tool);
 };
 
-const resolveSession = async (
-  preferredSessionKey: string | undefined,
-  context: { session?: McpSessionData },
-): Promise<{ sessionKey: string; sessionData: SessionValue; refreshed: boolean }> => {
-  const sessionStore = getSessionStore(context);
-  let sessionKey = preferredSessionKey ?? sessionStore.sessionKey;
-  let sessionData = sessionKey
-    ? await sessionService.getSession(sessionKey)
-    : undefined;
-  let refreshed = false;
-
-  if (!sessionKey || !sessionData) {
-    sessionKey = await sessionService.generateSession();
-    sessionData = (await sessionService.getSession(sessionKey)) ?? {
-      last_memory_key: "",
-    };
-    refreshed = true;
-  }
-
-  sessionStore.sessionKey = sessionKey;
-  return { sessionKey, sessionData, refreshed };
-};
-
-server.addTool({
+registerTool({
   name: "session_new",
   description: "创建新的session,每个session最多保持3分钟时效",
-  parameters: z.object({}),
-  execute: async (_args, context) => {
-    const sessionKey = await sessionService.generateSession();
+  parameters: SessionCreateSchema,
+  execute: async (args) => {
+    const namespace = args.namespace ?? "mem";
+    const sessionKey = await sessionService.generateSession(namespace);
     return JSON.stringify(sessionKey);
   },
 });
 
-server.addTool({
+registerTool({
   name: "memory_add",
   description: "Add a memory record",
   parameters: MemoryAddSchema,
   execute: async (args) => {
     try {
+      const sessionData = await sessionService.getSession(args.session);
+      if (!sessionData) {
+        return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
+      }
+      const namespace = sessionData.kv_namespace;
       const value: MemoryNoMeta = {
         ...args.value,
         links: args.value.links ?? [],
         keywords: args.value.keywords ?? [],
       };
 
-      await kvMemoryService.addMemory(args.key, value);
+      await kvMemoryService.addMemory(namespace, args.key, value);
 
-      return JSON.stringify({ success: true, key: args.key }, null, 2);
+      return JSON.stringify({ success: true }, null, 2);
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       return JSON.stringify({ success: false, message }, null, 2);
@@ -120,33 +75,38 @@ server.addTool({
   },
 });
 
-server.addTool({
+registerTool({
   name: "memory_get",
   description: "Get a memory record with session-aware traversal",
   parameters: MemoryGetSchema,
-  execute: async (args, context) => {
+  execute: async (args) => {
     try {
-      const { sessionKey, sessionData, refreshed } = await resolveSession(
-        args.session,
-        context,
-      );
+      const sessionData = await sessionService.getSession(args.session);
+      if (!sessionData) {
+        return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
+      }
 
-      if (sessionData.last_memory_key) {
-        await kvMemoryService.traverseMemory(sessionData.last_memory_key);
+      const namespace = sessionData.kv_namespace;
+      const lastMemoryKey = sessionData.last_memory_key;
+
+      if (lastMemoryKey !== "") {
+        await kvMemoryService.traverseMemory(namespace, lastMemoryKey);
       }
 
       const memory: MemoryNoMetaWithLinkSummary | undefined =
-        await kvMemoryService.getMemory(args.key);
+        await kvMemoryService.getMemory(namespace, args.key);
 
-      await sessionService.setSession(sessionKey, {
+      if (!memory) {
+        return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
+      }
+
+      await sessionService.setSession(args.session, {
         last_memory_key: args.key,
       });
 
       return JSON.stringify(
         {
           success: true,
-          session: sessionKey,
-          session_refreshed: refreshed,
           data: memory,
         },
         null,
@@ -159,31 +119,27 @@ server.addTool({
   },
 });
 
-server.addTool({
+registerTool({
   name: "memory_update",
   description: "Update a memory record",
   parameters: MemoryUpdateSchema,
-  execute: async (args, context) => {
+  execute: async (args) => {
     try {
-      const { refreshed } = await resolveSession(args.session, context);
-
-      if (args.session && refreshed) {
+      const sessionData = await sessionService.getSession(args.session);
+      if (!sessionData) {
         return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
       }
 
-      try {
-        await kvMemoryService.getMemory(args.key);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        if (message.includes("not found")) {
-          return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
-        }
-        throw error;
+      const namespace = sessionData.kv_namespace;
+
+      const existingMemory = await kvMemoryService.getMemory(namespace, args.key);
+      if (!existingMemory) {
+        return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
       }
 
-      await kvMemoryService.updateMemory(args.key, args.value);
+      await kvMemoryService.updateMemory(namespace, args.key, args.value);
 
-      return JSON.stringify({ success: true, key: args.key }, null, 2);
+      return JSON.stringify({ success: true, data: { key: args.key } }, null, 2);
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       return JSON.stringify({ success: false, message }, null, 2);
@@ -191,17 +147,18 @@ server.addTool({
   },
 });
 
-server.addTool({
+registerTool({
   name: "memory_rename",
   description: "Rename a memory key",
   parameters: MemoryRenameSchema,
-  execute: async (args, context) => {
+  execute: async (args) => {
     try {
-      const { refreshed } = await resolveSession(args.session, context);
-
-      if (args.session && refreshed) {
+      const sessionData = await sessionService.getSession(args.session);
+      if (!sessionData) {
         return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
       }
+
+      const namespace = sessionData.kv_namespace;
 
       if (args.old_key === args.new_key) {
         return JSON.stringify(
@@ -211,30 +168,20 @@ server.addTool({
         );
       }
 
-      try {
-        await kvMemoryService.getMemory(args.old_key);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        if (message.includes("not found")) {
-          return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
-        }
-        throw error;
+      const oldMemory = await kvMemoryService.getMemory(namespace, args.old_key);
+      if (!oldMemory) {
+        return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
       }
 
-      try {
-        await kvMemoryService.getMemory(args.new_key);
+      const newMemory = await kvMemoryService.getMemory(namespace, args.new_key);
+      if (newMemory) {
         return JSON.stringify({ success: false, message: "key already exists" }, null, 2);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown error";
-        if (!message.includes("not found")) {
-          throw error;
-        }
       }
 
-      await kvMemoryService.updateKey(args.old_key, args.new_key);
+      await kvMemoryService.updateKey(namespace, args.old_key, args.new_key);
 
       return JSON.stringify(
-        { success: true, old_key: args.old_key, new_key: args.new_key },
+        { success: true, data: { old_key: args.old_key, new_key: args.new_key } },
         null,
         2,
       );
@@ -246,11 +193,16 @@ server.addTool({
 });
 
 server.addResourceTemplate({
-  uriTemplate: "memory://{key}",
+  uriTemplate: "memory://{namespace}/{key}",
   name: "KVDB Memory",
   description: "Read-only access to memory records",
   mimeType: "application/json",
   arguments: [
+    {
+      name: "namespace",
+      description: "Memory namespace (defaults to mem)",
+      required: false,
+    },
     {
       name: "key",
       description: "Memory key",
@@ -258,17 +210,18 @@ server.addResourceTemplate({
     },
   ],
   load: async (args) => {
+    const namespace = (args.namespace as string | undefined) ?? "mem";
     try {
       const memory: MemoryNoMetaWithLinkSummary | undefined =
-        await kvMemoryService.getMemory(args.key);
+        await kvMemoryService.getMemory(namespace, args.key);
       return {
-        uri: `memory://${args.key}`,
+        uri: `memory://${namespace}/${args.key}`,
         text: JSON.stringify(memory, null, 2),
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       return {
-        uri: `memory://${args.key}`,
+        uri: `memory://${namespace}/${args.key}`,
         text: JSON.stringify({ success: false, message }, null, 2),
       };
     }
@@ -337,7 +290,16 @@ server.addPrompt({
   },
 });
 
-export const mcpServer = server;
+Object.assign(
+  server as FastMCP & {
+    _tools: Map<string, McpToolDefinition>;
+    getTool: (name: string) => McpToolDefinition | undefined;
+  },
+  {
+    _tools: toolRegistry,
+    getTool: (name: string) => toolRegistry.get(name),
+  },
+);
 
 export const startMcpServer = async () => {
   const port = Number(Bun.env.MCP_PORT ?? "8787");
@@ -352,8 +314,6 @@ export const startMcpServer = async () => {
       endpoint,
     },
   });
-
-  return;
 };
 
 if (import.meta.main) {

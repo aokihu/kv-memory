@@ -1,12 +1,23 @@
-const recallMemoryArguments = [
+import type { InputPrompt } from "fastmcp";
+
+type McpSessionAuth = Record<string, unknown> | undefined;
+type RecallMemoryArguments = [
+  {
+    name: "key";
+    description: "Memory key";
+    required: true;
+  },
+];
+
+const recallMemoryArguments: RecallMemoryArguments = [
   {
     name: "key",
     description: "Memory key",
     required: true,
   },
-] as const;
+];
 
-export const recallMemoryPrompt = {
+export const recallMemoryPrompt: InputPrompt<McpSessionAuth, RecallMemoryArguments> = {
   name: "recall_memory",
   description: "Guide an agent to recall memory by key",
   arguments: [...recallMemoryArguments],

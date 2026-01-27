@@ -1,3 +1,4 @@
+import { encode } from "@toon-format/toon";
 import { type Tool } from "fastmcp";
 import { KVMemoryService, SessionService } from "../../service";
 import type { MemoryNoMetaWithLinkSummary } from "../../service/kvmemory";
@@ -17,13 +18,16 @@ export const createMemoryGetTool = (
   parameters: MemoryGetSchema,
   execute: async (args: MemoryGetInput) => {
     try {
-      const sessionData = await sessionService.getSession(args.session);
-      if (!sessionData) {
-        return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
+      let namespace = "mem";
+      let lastMemoryKey = "";
+      if (args.session) {
+        const sessionData = await sessionService.getSession(args.session);
+        if (!sessionData) {
+          return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
+        }
+        namespace = sessionData.kv_namespace;
+        lastMemoryKey = sessionData.last_memory_key;
       }
-
-      const namespace = sessionData.kv_namespace;
-      const lastMemoryKey = sessionData.last_memory_key;
 
       if (lastMemoryKey !== "") {
         await kvMemoryService.traverseMemory(namespace, lastMemoryKey);
@@ -36,18 +40,20 @@ export const createMemoryGetTool = (
         return JSON.stringify({ success: false, message: "memory not found" }, null, 2);
       }
 
-      await sessionService.setSession(args.session, {
-        last_memory_key: args.key,
-      });
+      if (args.session) {
+        await sessionService.setSession(args.session, {
+          last_memory_key: args.key,
+        });
+      }
 
-      return JSON.stringify(
-        {
-          success: true,
-          data: memory,
-        },
-        null,
-        2,
-      );
+      const outputFormat = args.output_format ?? "toon";
+      const payload = { success: true, data: memory };
+
+      if (outputFormat === "toon") {
+        return encode(payload);
+      }
+
+      return JSON.stringify(payload, null, 2);
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       return JSON.stringify({ success: false, message }, null, 2);

@@ -11,26 +11,30 @@ export const MemoryValueSchema = MemoryNoMetaSchema.extend({
 });
 
 export const MemoryAddSchema = z.object({
-  session: z.string().min(1),
+  session: z.string().min(1).optional(),
   key: z.string().min(1),
   value: MemoryValueSchema,
+  output_format: z.enum(["json", "toon"]).default("toon"),
 });
 
 export const MemoryGetSchema = z.object({
   key: z.string().min(1),
-  session: z.string().min(1),
+  session: z.string().min(1).optional(),
+  output_format: z.enum(["json", "toon"]).default("toon"),
 });
 
 export const MemoryUpdateSchema = z.object({
   key: z.string().min(1),
   value: MemoryNoMetaSchema.partial(),
-  session: z.string().min(1),
+  session: z.string().min(1).optional(),
+  output_format: z.enum(["json", "toon"]).default("toon"),
 });
 
 export const MemoryRenameSchema = z.object({
   old_key: z.string().min(1),
   new_key: z.string().min(1),
-  session: z.string().min(1),
+  session: z.string().min(1).optional(),
+  output_format: z.enum(["json", "toon"]).default("toon"),
 });
 
 export type MemoryAddInput = z.infer<typeof MemoryAddSchema>;

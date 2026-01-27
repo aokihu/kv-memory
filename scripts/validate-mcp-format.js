@@ -178,7 +178,11 @@ const run = async () => {
     keywords: ["mcp", "validation", "links"],
   };
 
-  const addBaseRaw = await runTool("memory_add", addTool, { key: baseKey, value: baseMemory });
+  const addBaseRaw = await runTool("memory_add", addTool, {
+    key: baseKey,
+    value: baseMemory,
+    output_format: "json",
+  });
   const addBaseResult = addBaseRaw ? safeJsonParse("memory_add base parse", addBaseRaw) : null;
   assertTrue(
     "memory_add base success",
@@ -186,7 +190,11 @@ const run = async () => {
     addBaseResult?.message ?? "memory_add failed",
   );
 
-  const addTestRaw = await runTool("memory_add", addTool, { key: testKey, value: testMemory });
+  const addTestRaw = await runTool("memory_add", addTool, {
+    key: testKey,
+    value: testMemory,
+    output_format: "json",
+  });
   const addTestResult = addTestRaw ? safeJsonParse("memory_add test parse", addTestRaw) : null;
   assertTrue(
     "memory_add test success",
@@ -194,7 +202,10 @@ const run = async () => {
     addTestResult?.message ?? "memory_add failed",
   );
 
-  const getRaw = await runTool("memory_get", getTool, { key: testKey });
+  const getRaw = await runTool("memory_get", getTool, {
+    key: testKey,
+    output_format: "json",
+  });
   const getResult = getRaw ? safeJsonParse("memory_get parse", getRaw) : null;
   assertTrue(
     "memory_get success",

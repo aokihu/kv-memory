@@ -117,6 +117,7 @@
   ```
 
 - **注意**：`links` 与 `keywords` 可省略，服务端会填充空数组再写入。
+- **可选参数**：通过 `output_format` 调整工具返回数据格式，支持 `toon`（默认）与 `json`，便于客户端解析。
 - **返回值**：`{ success: true, key: "..." }` 或包含 `message` 的错误对象。
 
 ### `memory_get`
@@ -127,14 +128,15 @@
   ```json
   {
     "key": "decision/42",
-    "session": "<可选的 session key>"
+    "session": "<可选的 session key>",
+    "output_format": "toon"  // 可选，默认 toon，可设置为 json
   }
   ```
 
 - **行为**：
   1. 如果传入 `session` 或 STDIO 缓存里有，会尝试加载已有会话并跑一次 `traverseMemory(last_memory_key)`，保持路径一致。
   2. 每次调用都更新 `Session` 为当前 `key`。
-- **返回**：含 `success`, `session`, `session_refreshed`, `data` 字段的 JSON；`data` 包含完整的 `Memory` 体（含 meta）。
+- **返回**：默认返回 TOON 格式，包含 `success`、`session`、`session_refreshed` 及完整的 `Memory` 数据；可通过 `output_format: "json"` 获取 JSON 输出（错误响应始终返回 JSON）。
 
 ### `memory_update`
 
@@ -151,6 +153,7 @@
     "session": "session_123"
   }
   ```
+- **可选参数**：支持 `output_format`（`toon` | `json`），默认 TOON，以便于 Agent 在不同客户端解析。
 
 - **行为**：
   1. 验证 `session` 有效性，失败时返回 `success: false` 及提示。
@@ -171,6 +174,7 @@
     "session": "session_123"
   }
   ```
+- **可选参数**：可以传入 `output_format`（`toon` 或 `json`），默认 `toon`。
 
 - **行为**：
   1. 校验 `session`（若提供），确保会话尚可用。
@@ -228,6 +232,7 @@
 | `MCP_PORT` | `8787` | HTTP stream 服务监听端口，仅对 HTTP 相关传输有效 |
 | `MCP_HOST` | (未设置) | 绑定的主机地址，留空为自动匹配 |
 | `MCP_ENDPOINT` | `/mcp` | HTTP 流式服务的路径，向下兼容 `fastmcp` 默认 |
+| `MCP_OUTPUT_FORMAT` | `toon` | 默认 `memory_*` 工具的输出格式，可选 `toon` 或 `json`；错误响应始终为 JSON。 |
 
 其他 `Bun` 环境变量（如 `BUN_DEBUG`）可继续用于 Bun 运行时行为。
 
@@ -256,6 +261,31 @@ cat /tmp/mcp.cmd | bun run mcp
 ```
 
 每一行 JSON 会被 `fastmcp` 识别为一条工具调用，响应逐行输出（可结合 `jq` 观察）。
+
+### TOON格式输出示例
+
+默认情况下，`memory_get` 返回 TOON 格式：
+
+```
+domain: product
+summary: 将记忆存入KVDB
+text: ...更长的背景描述...
+type: decision
+links[0]:
+keywords[2]: 决策,KVDB
+```
+
+如需 JSON 格式，请指定 `output_format` 参数：
+
+```json
+{
+  "tool": "memory_get",
+  "arguments": {
+    "key": "decision/42",
+    "output_format": "json"
+  }
+}
+```
 
 ### HTTP Streaming 模式
 

@@ -338,7 +338,7 @@ const run = async () => {
       const addUpdateRaw = await runTool(
         "memory_add",
         addTool,
-        { key: updateKey, value: baseMemory },
+        { key: updateKey, value: baseMemory, output_format: "json" },
         {},
       );
       const addUpdateResult = addUpdateRaw
@@ -353,7 +353,7 @@ const run = async () => {
       const updateRaw = await runTool(
         "memory_update",
         updateTool,
-        { key: updateKey, value: updatePayload },
+        { key: updateKey, value: updatePayload, output_format: "json" },
         {},
       );
       const updateResult = updateRaw
@@ -368,7 +368,7 @@ const run = async () => {
       const updatedGetRaw = await runTool(
         "memory_get",
         getTool,
-        { key: updateKey },
+        { key: updateKey, output_format: "json" },
         {},
       );
       const updatedGetResult = updatedGetRaw
@@ -411,7 +411,7 @@ const run = async () => {
       const addRenameRaw = await runTool(
         "memory_add",
         addTool,
-        { key: renameOldKey, value: renamePayload },
+        { key: renameOldKey, value: renamePayload, output_format: "json" },
         {},
       );
       const addRenameResult = addRenameRaw
@@ -426,7 +426,7 @@ const run = async () => {
       const renameRaw = await runTool(
         "memory_rename",
         renameTool,
-        { old_key: renameOldKey, new_key: renameNewKey },
+        { old_key: renameOldKey, new_key: renameNewKey, output_format: "json" },
         {},
       );
       const renameResult = renameRaw
@@ -441,7 +441,7 @@ const run = async () => {
       const oldKeyRaw = await runTool(
         "memory_get",
         getTool,
-        { key: renameOldKey },
+        { key: renameOldKey, output_format: "json" },
         {},
       );
       const oldKeyResult = oldKeyRaw
@@ -456,7 +456,7 @@ const run = async () => {
       const newKeyRaw = await runTool(
         "memory_get",
         getTool,
-        { key: renameNewKey },
+        { key: renameNewKey, output_format: "json" },
         {},
       );
       const newKeyResult = newKeyRaw

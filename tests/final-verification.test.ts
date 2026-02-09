@@ -1,0 +1,133 @@
+/**
+ * Final deployment verification test suite.
+ *
+ * Coverage focus:
+ * 1) service-level core workflow
+ * 2) migration dry-run/actual simulation on synthetic legacy data
+ */
+
+import { afterEach, describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { initDatabase, getDatabase, migrateKeyvToSQLite } from "../src/libs/db";
+import { KVMemoryService } from "../src/service";
+import { MemoryStatusEnums, type Memory } from "../src/type";
+
+const runtimeDb = initDatabase(getDatabase());
+
+let namespace = "";
+
+function makeNamespace(): string {
+  return `final_verify_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function makeMemory(id: string): Memory {
+  const now = Date.now();
+  return {
+    domain: "verify",
+    summary: `summary-${id}`,
+    text: `text-${id}`,
+    type: "decision",
+    keywords: ["verify", id],
+    links: [],
+    meta: {
+      id,
+      created_at: now,
+      last_accessed_at: now,
+      last_linked_at: now,
+      in_degree: 0,
+      out_degree: 0,
+      access_count: 0,
+      traverse_count: 0,
+      status: MemoryStatusEnums.parse("active"),
+    },
+  };
+}
+
+afterEach(() => {
+  if (!namespace) {
+    return;
+  }
+
+  runtimeDb.query("DELETE FROM memory_links WHERE namespace = ?").run(namespace);
+  runtimeDb.query("DELETE FROM memories WHERE namespace = ?").run(namespace);
+  namespace = "";
+});
+
+describe("final verification", () => {
+  test("core service workflow remains functional", async () => {
+    namespace = makeNamespace();
+    const service = new KVMemoryService();
+
+    await service.addMemory(namespace, "a", {
+      domain: "verify",
+      summary: "A",
+      text: "A text",
+      type: "decision",
+      keywords: ["A"],
+      links: [],
+    });
+
+    await service.addMemory(namespace, "b", {
+      domain: "verify",
+      summary: "B",
+      text: "B text",
+      type: "design",
+      keywords: ["B"],
+      links: [{ type: "design", key: "a", term: "points to a", weight: 0.7 }],
+    });
+
+    const fetched = await service.getMemory(namespace, "b");
+    expect(fetched?.summary).toBe("B");
+    expect(fetched?.links.length).toBe(1);
+    expect(fetched?.links[0]?.summary).toBe("A");
+
+    await service.updateMemory(namespace, "b", { summary: "B2" });
+    const updated = await service.getMemory(namespace, "b");
+    expect(updated?.summary).toBe("B2");
+
+    const traversed = await service.traverseMemory(namespace, "b");
+    expect((traversed?.meta.traverse_count ?? 0) >= 1).toBe(true);
+
+    await service.updateKey(namespace, "b", "b_renamed");
+    expect(await service.getMemory(namespace, "b")).toBeUndefined();
+    expect((await service.getMemory(namespace, "b_renamed"))?.summary).toBe("B2");
+  });
+
+  test("migration simulation supports dry-run and actual migration", () => {
+    const dir = mkdtempSync(join(tmpdir(), "kvdb-final-verify-"));
+    const sourcePath = join(dir, "legacy.db");
+    const targetPath = join(dir, "migrated.db");
+    const backupDir = join(dir, "backup");
+
+    try {
+      const source = new Database(sourcePath);
+      source.exec("CREATE TABLE keyv(key VARCHAR(255) PRIMARY KEY, value TEXT)");
+      source
+        .query("INSERT INTO keyv(key, value) VALUES (?, ?)")
+        .run("mem:m1", JSON.stringify({ value: makeMemory("m1") }));
+      source
+        .query("INSERT INTO keyv(key, value) VALUES (?, ?)")
+        .run("_session_:skip", JSON.stringify({ value: { kv_namespace: "mem", last_memory_key: "m1" } }));
+      source.close();
+
+      const dry = migrateKeyvToSQLite({ sourcePath, targetPath, backupDir, dryRun: true });
+      expect(dry.sourceRows).toBe(2);
+      expect(dry.migratedRecords).toBe(1);
+      expect(dry.skippedRows).toBe(1);
+
+      const actual = migrateKeyvToSQLite({ sourcePath, targetPath, backupDir });
+      expect(actual.validation.mismatches.length).toBe(0);
+      expect(actual.migratedRecords).toBe(1);
+
+      const target = new Database(targetPath, { readonly: true, create: false });
+      const count = target.query("SELECT COUNT(*) as count FROM memories").get() as { count: number };
+      expect(count.count).toBe(1);
+      target.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

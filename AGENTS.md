@@ -95,11 +95,14 @@ Agent 可以通过 link 进行 **链式回溯与上下文扩展**，
 - `src/type.ts`  
   记忆模型与 Schema 定义（Zod）
 
-- `src/kv.ts`  
+- `src/libs/kv/kv.ts`  
   Key–Value 记忆核心逻辑（读写、访问、演化）
 
-- `src/db.ts`  
-  Database 层配置与工具
+- `src/libs/db/schema.ts`  
+  Database 层 schema 与初始化
+
+- `src/libs/db/config.ts`  
+  Database 配置项（数据库路径与 pragma）
 
 - `src/index.ts`  
   应用入口或统一导出
@@ -111,7 +114,7 @@ Agent 可以通过 link 进行 **链式回溯与上下文扩展**，
 ## Development and Runtime
 
 - 使用 **Bun** 作为运行时与工具链  
-- Key–Value 层基于 `@keyv/sqlite`  
+- Key–Value 层基于 **`bun:sqlite`**  
 - 所有外部或持久化数据在使用前必须通过 **Zod 校验**
 
 ### 常用命令

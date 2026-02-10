@@ -149,19 +149,14 @@ const run = async () => {
   const testKey = `mcp-format-test-${keySuffix}`;
 
   const baseMemory = {
-    domain: "mcp-test",
     summary: "Base memory for link summary",
     text: "This memory is used to populate link summary.",
-    type: "note",
     links: [],
-    keywords: ["mcp", "format"],
   };
 
   const testMemory = {
-    domain: "mcp-test",
     summary: "Format verification memory",
     text: "Validates memory_get response fields and link schema.",
-    type: "note",
     links: [
       {
         type: "design",
@@ -175,7 +170,6 @@ const run = async () => {
         weight: 0.4,
       },
     ],
-    keywords: ["mcp", "validation", "links"],
   };
 
   const addBaseRaw = await runTool("memory_add", addTool, {
@@ -218,19 +212,13 @@ const run = async () => {
 
   if (data && typeof data === "object") {
     ensureFields("memory data fields", data, [
-      "domain",
       "summary",
       "text",
-      "type",
       "links",
-      "keywords",
     ]);
 
-    assertTrue("domain is string", typeof data.domain === "string", "domain must be string");
     assertTrue("summary is string", typeof data.summary === "string", "summary must be string");
     assertTrue("text is string", typeof data.text === "string", "text must be string");
-    assertTrue("type is string", typeof data.type === "string", "type must be string");
-    assertTrue("keywords is array", Array.isArray(data.keywords), "keywords must be array");
 
     validateLinks(data.links);
   }

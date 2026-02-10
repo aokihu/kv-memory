@@ -16,8 +16,7 @@ const RequestBodySchema = z.object({
     key: z.string(),
     value: MemoryNoMetaSchema.extend({
         links: MemoryNoMetaSchema.shape.links.optional(),
-        keywords: MemoryNoMetaSchema.shape.keywords.optional(),
-    }),
+    }).strict(), // 拒绝任何额外字段，包括 domain 和 type
 })
 
 type RequestBody = z.infer<typeof RequestBodySchema>
@@ -48,7 +47,6 @@ export const addMemoryController = async (req: Bun.BunRequest<"/add_memory">, ct
         await ctx.kvMemoryService.addMemory(ns, key, {
             ...value,
             links: value.links ?? [],
-            keywords: value.keywords ?? [],
         });
 
         return Response.json({ success: true });

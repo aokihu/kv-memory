@@ -29,7 +29,6 @@ export const createMemoryAddTool = (
       const value: MemoryNoMeta = {
         ...args.value,
         links: args.value.links ?? [],
-        keywords: args.value.keywords ?? [],
       };
 
       await kvMemoryService.addMemory(namespace, args.key, value);

@@ -26,7 +26,7 @@ type LinkBenchmarkMetric = {
  */
 export async function runLinkTraversalBenchmark(): Promise<LinkBenchmarkMetric[]> {
   const namespace = `bench_link_${Date.now()}`;
-  const kv = new KVMemory(namespace);
+  const kv = new KVMemory();
   const db = initDatabase(getDatabase()) as Database;
 
   try {
@@ -47,11 +47,8 @@ export async function runLinkTraversalBenchmark(): Promise<LinkBenchmarkMetric[]
 async function seedGraph(kv: KVMemory, nodeCount: number, linksPerNode: number): Promise<void> {
   for (let index = 0; index < nodeCount; index += 1) {
     await kv.add(`node_${index}`, {
-      domain: "bench",
       summary: `node-summary-${index}`,
       text: `node-text-${index}`,
-      type: "design",
-      keywords: ["graph", `${index}`],
       links: [],
     });
   }

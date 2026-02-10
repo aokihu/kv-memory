@@ -2,15 +2,21 @@
  * 更新记忆控制器
  * @author aokihu <aokihu@gmail.com>
  * @license MIT
- * @description RequestBody.value 使用 Partial<MemoryNoMeta>，关键词和链接可选
+ * @description RequestBody.value 使用 Partial<MemoryNoMeta>，关键词和链接可选，拒绝domain和type字段
  */
 import { z } from 'zod'
 import { type AppServerContext, type MemoryNoMeta, MemoryNoMetaSchema } from '../type'
 
+// 拒绝domain和type字段的验证器
+const RejectDomainTypeSchema = z.object({
+    domain: z.never().optional(),
+    type: z.never().optional(),
+})
+
 const RequestBodySchema = z.object({
     session: z.string(),
     key: z.string(),
-    value: MemoryNoMetaSchema.partial(),
+    value: MemoryNoMetaSchema.partial().and(RejectDomainTypeSchema),
 })
 
 type RequestBody = z.infer<typeof RequestBodySchema>

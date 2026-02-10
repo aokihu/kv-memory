@@ -35,12 +35,10 @@ export const captureMemoryPrompt: InputPrompt<
             text:
               "Create a structured memory payload for KVDB. Output JSON with:\n" +
               "- key (string)\n" +
-              "- value.domain (string)\n" +
               "- value.summary (string, 1-2 sentences)\n" +
               "- value.text (string, detailed)\n" +
-              "- value.type (string)\n" +
               "- value.links (array of { type, term, weight })\n" +
-              "- value.keywords (array of strings)\n\n" +
+              "\n" +
               `Use key: ${key}. Keep links empty when unknown.` +
               "你可以设置一个index作为key,当作是整个记忆仓库的入口,其中保存你认为的重要的记忆或者具有很好联想能力的记忆条目" +
               "当你没有任何合适的key时,可以使用默认的key: index"

@@ -2,7 +2,7 @@
  * SQLite schema bootstrap tests.
  */
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -16,6 +16,11 @@ function makeTempDatabasePath(): { dir: string; file: string } {
 
 afterEach(() => {
   // Always reset singleton between tests, otherwise database file path lock is expected.
+  closeDatabase();
+});
+
+beforeEach(() => {
+  // Ensure previous suites do not leak singleton before this file starts.
   closeDatabase();
 });
 
@@ -38,8 +43,6 @@ describe("db schema", () => {
       expect(linksTable?.name).toBe("memory_links");
 
       const requiredIndexes = [
-        "idx_memories_namespace",
-        "idx_memories_domain",
         "idx_memories_created_at",
         "idx_memory_links_from_key",
         "idx_memory_links_to_key",

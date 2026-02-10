@@ -13,12 +13,8 @@ import { MemoryLink, MemoryMetaSchema, MemorySchema } from "../../type";
  */
 export type MemoryRow = {
   key: string;
-  namespace: string;
-  domain: string;
   summary: string;
   text: string;
-  type: string;
-  keywords: string;
   meta: string;
   links: string;
   created_at: number;
@@ -28,7 +24,6 @@ export type MemoryRow = {
  * Raw row shape for `memory_links` insert operations.
  */
 export type MemoryLinkRow = {
-  namespace: string;
   from_key: string;
   to_key: string;
   link_type: string;
@@ -44,16 +39,12 @@ export type MemoryLinkRow = {
  */
 export function memoryRowToMemory(row: MemoryRow): Memory {
   const meta = MemoryMetaSchema.parse(JSON.parse(row.meta));
-  const keywords = parseStringArray(row.keywords);
   const links = parseMemoryLinks(row.links);
 
   return MemorySchema.parse({
     meta,
-    domain: row.domain,
     summary: row.summary,
     text: row.text,
-    type: row.type,
-    keywords,
     links,
   });
 }
@@ -64,11 +55,8 @@ export function memoryRowToMemory(row: MemoryRow): Memory {
  * Trigger condition: add/update write path.
  */
 export function memoryToWritableColumns(memory: Memory): {
-  domain: string;
   summary: string;
   text: string;
-  type: string;
-  keywords: string;
   meta: string;
   links: string;
   created_at: number;
@@ -76,11 +64,8 @@ export function memoryToWritableColumns(memory: Memory): {
   const validated = MemorySchema.parse(memory);
 
   return {
-    domain: validated.domain,
     summary: validated.summary,
     text: validated.text,
-    type: validated.type,
-    keywords: JSON.stringify(validated.keywords),
     meta: JSON.stringify(validated.meta),
     links: JSON.stringify(validated.links),
     created_at: validated.meta.created_at,
@@ -94,7 +79,6 @@ export function memoryToWritableColumns(memory: Memory): {
  * Debug hint: links without `key` are intentionally skipped.
  */
 export function linksToRelationRows(
-  namespace: string,
   fromKey: string,
   links: Memory["links"],
   createdAt: number,
@@ -108,7 +92,6 @@ export function linksToRelationRows(
     }
 
     rows.push({
-      namespace,
       from_key: fromKey,
       to_key: link.key,
       link_type: link.type,
@@ -118,23 +101,6 @@ export function linksToRelationRows(
   }
 
   return rows;
-}
-
-/**
- * Parse JSON string array safely with validation.
- */
-function parseStringArray(raw: string): string[] {
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    throw new Error("keywords column is not an array");
-  }
-
-  return parsed.map((value) => {
-    if (typeof value !== "string") {
-      throw new Error("keywords array contains non-string value");
-    }
-    return value;
-  });
 }
 
 /**

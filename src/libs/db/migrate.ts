@@ -124,41 +124,34 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
 
   runInTransaction(targetDatabase, () => {
     const upsertMemory = targetDatabase.query(
-      `INSERT INTO memories (key, namespace, domain, summary, text, type, keywords, meta, links, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(namespace, key) DO UPDATE SET
-         domain = excluded.domain,
-         summary = excluded.summary,
-         text = excluded.text,
-         type = excluded.type,
-         keywords = excluded.keywords,
-         meta = excluded.meta,
-         links = excluded.links,
-         created_at = excluded.created_at`,
+      `INSERT INTO memories (key, summary, text, meta, links, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET
+           summary = excluded.summary,
+           text = excluded.text,
+          meta = excluded.meta,
+          links = excluded.links,
+          created_at = excluded.created_at`,
     );
 
     const deleteLinkBySource = targetDatabase.query(
-      `DELETE FROM memory_links WHERE namespace = ? AND from_key = ?`,
+      `DELETE FROM memory_links WHERE from_key = ?`,
     );
 
     const insertLinkIfTargetExists = targetDatabase.query(
-      `INSERT INTO memory_links (namespace, from_key, to_key, link_type, weight, created_at)
-       SELECT ?, ?, ?, ?, ?, ?
-       WHERE EXISTS (
-         SELECT 1 FROM memories m WHERE m.namespace = ? AND m.key = ?
-       )`,
+      `INSERT INTO memory_links (from_key, to_key, link_type, weight, created_at)
+       SELECT ?, ?, ?, ?, ?
+        WHERE EXISTS (
+         SELECT 1 FROM memories m WHERE m.key = ?
+        )`,
     );
 
     for (const record of records) {
       const writable = buildWritableMigrationData(record);
       upsertMemory.run(
         writable.key,
-        writable.namespace,
-        writable.memoryColumns.domain,
         writable.memoryColumns.summary,
         writable.memoryColumns.text,
-        writable.memoryColumns.type,
-        writable.memoryColumns.keywords,
         writable.memoryColumns.meta,
         writable.memoryColumns.links,
         writable.memoryColumns.created_at,
@@ -167,17 +160,15 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
 
     for (const record of records) {
       const writable = buildWritableMigrationData(record);
-      deleteLinkBySource.run(writable.namespace, writable.key);
+      deleteLinkBySource.run(writable.key);
 
       for (const linkRow of writable.linkRows) {
         const result = insertLinkIfTargetExists.run(
-          linkRow.namespace,
           linkRow.from_key,
           linkRow.to_key,
           linkRow.link_type,
           linkRow.weight,
           linkRow.created_at,
-          linkRow.namespace,
           linkRow.to_key,
         );
 

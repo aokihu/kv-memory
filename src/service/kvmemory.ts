@@ -23,11 +23,11 @@ export class KVMemoryService {
   private _kvCollect: Map<string, KVMemory> = new Map();
 
   constructor() {
-    this._kvCollect.set('mem', new KVMemory('mem')); // 初始化时候创建一个默认的记忆命名空间
+    this._kvCollect.set('mem', new KVMemory()); // 初始化时候创建一个默认的记忆命名空间
   }
 
   addKVMemory(namespace: string) {
-    this._kvCollect.set(namespace, new KVMemory(namespace));
+    this._kvCollect.set(namespace, new KVMemory());
   }
 
   /**

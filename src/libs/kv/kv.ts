@@ -25,20 +25,16 @@ import {
   type MemoryRow,
 } from "../db";
 
-const NAMESPACE = "mem";
-
 export class KVMemory {
   private _database: Database;
-  private _namespace: string;
 
-  constructor(namespace: string = NAMESPACE) {
-    this._namespace = namespace;
+  constructor() {
     this._database = initDatabase(getDatabase());
 
     // Mixed access with other SQLite clients (e.g. legacy Keyv session storage)
     // may hit transient write locks; WAL + busy timeout improves interoperability.
-    this._database.exec("PRAGMA journal_mode = WAL;");
-    this._database.exec("PRAGMA busy_timeout = 5000;");
+    this._database.run("PRAGMA journal_mode = WAL;");
+    this._database.run("PRAGMA busy_timeout = 5000;");
   }
 
   async add(key: string, arg: MemoryNoMeta) {
@@ -69,17 +65,13 @@ export class KVMemory {
       this._database
         .query(
           `INSERT OR REPLACE INTO memories
-           (key, namespace, domain, summary, text, type, keywords, meta, links, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (key, summary, text, meta, links, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           key,
-          this._namespace,
-          writable.domain,
           writable.summary,
           writable.text,
-          writable.type,
-          writable.keywords,
           writable.meta,
           writable.links,
           writable.created_at,
@@ -113,8 +105,10 @@ export class KVMemory {
 
     runInTransaction(this._database, () => {
       this._database
-        .query(`UPDATE memories SET meta = ?, created_at = ? WHERE namespace = ? AND key = ?`)
-        .run(writable.meta, writable.created_at, this._namespace, key);
+        .query(
+          `UPDATE memories SET meta = ?, created_at = ? WHERE key = ?`,
+        )
+        .run(writable.meta, writable.created_at, key);
     });
   }
 
@@ -132,23 +126,23 @@ export class KVMemory {
       this._database
         .query(
           `UPDATE memories
-           SET domain = ?, summary = ?, text = ?, type = ?, keywords = ?, meta = ?, links = ?, created_at = ?
-           WHERE namespace = ? AND key = ?`,
+           SET summary = ?, text = ?, meta = ?, links = ?, created_at = ?
+           WHERE key = ?`,
         )
         .run(
-          writable.domain,
           writable.summary,
           writable.text,
-          writable.type,
-          writable.keywords,
           writable.meta,
           writable.links,
           writable.created_at,
-          this._namespace,
           key,
         );
 
-      this.replaceLinkRelations(key, updatedMemory.links, updatedMemory.meta.created_at);
+      this.replaceLinkRelations(
+        key,
+        updatedMemory.links,
+        updatedMemory.meta.created_at,
+      );
     });
   }
 
@@ -170,17 +164,13 @@ export class KVMemory {
       this._database
         .query(
           `INSERT INTO memories
-           (key, namespace, domain, summary, text, type, keywords, meta, links, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (key, summary, text, meta, links, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           newKey,
-          this._namespace,
-          writable.domain,
           writable.summary,
           writable.text,
-          writable.type,
-          writable.keywords,
           writable.meta,
           writable.links,
           writable.created_at,
@@ -191,21 +181,21 @@ export class KVMemory {
         .query(
           `UPDATE memory_links
            SET from_key = ?
-           WHERE namespace = ? AND from_key = ?`,
+           WHERE from_key = ?`,
         )
-        .run(newKey, this._namespace, oldKey);
+        .run(newKey, oldKey);
 
       this._database
         .query(
           `UPDATE memory_links
            SET to_key = ?
-           WHERE namespace = ? AND to_key = ?`,
+           WHERE to_key = ?`,
         )
-        .run(newKey, this._namespace, oldKey);
+        .run(newKey, oldKey);
 
       this._database
-        .query(`DELETE FROM memories WHERE namespace = ? AND key = ?`)
-        .run(this._namespace, oldKey);
+        .query(`DELETE FROM memories WHERE key = ?`)
+        .run(oldKey);
 
       // Rebuild outgoing links from JSON to guarantee row-level consistency.
       this.replaceLinkRelations(newKey, updated.links, updated.meta.created_at);
@@ -217,19 +207,23 @@ export class KVMemory {
    *
    * Debug hint: if relation table misses expected rows, inspect `existsMemory()` filter.
    */
-  private replaceLinkRelations(fromKey: string, links: Memory["links"], createdAt: number): void {
+  private replaceLinkRelations(
+    fromKey: string,
+    links: Memory["links"],
+    createdAt: number,
+  ): void {
     this._database
-      .query(`DELETE FROM memory_links WHERE namespace = ? AND from_key = ?`)
-      .run(this._namespace, fromKey);
+      .query(`DELETE FROM memory_links WHERE from_key = ?`)
+      .run(fromKey);
 
-    const rows = linksToRelationRows(this._namespace, fromKey, links, createdAt);
+    const rows = linksToRelationRows(fromKey, links, createdAt);
     if (rows.length === 0) {
       return;
     }
 
     const insertLinkStatement = this._database.query(
-      `INSERT INTO memory_links (namespace, from_key, to_key, link_type, weight, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO memory_links (from_key, to_key, link_type, weight, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
     );
 
     for (const row of rows) {
@@ -239,7 +233,6 @@ export class KVMemory {
       }
 
       insertLinkStatement.run(
-        row.namespace,
         row.from_key,
         row.to_key,
         row.link_type,
@@ -250,12 +243,12 @@ export class KVMemory {
   }
 
   /**
-   * Check whether a memory key exists in current namespace.
+   * Check whether a memory key exists.
    */
   private existsMemory(key: string): boolean {
     const row = this._database
-      .query(`SELECT key FROM memories WHERE namespace = ? AND key = ? LIMIT 1`)
-      .get(this._namespace, key) as { key: string } | null;
+      .query(`SELECT key FROM memories WHERE key = ? LIMIT 1`)
+      .get(key) as { key: string } | null;
 
     return row !== null;
   }
@@ -266,12 +259,12 @@ export class KVMemory {
   private getMemoryRow(key: string): MemoryRow | undefined {
     const row = this._database
       .query(
-        `SELECT key, namespace, domain, summary, text, type, keywords, meta, links, created_at
+        `SELECT key, summary, text, meta, links, created_at
          FROM memories
-         WHERE namespace = ? AND key = ?
+         WHERE key = ?
          LIMIT 1`,
       )
-      .get(this._namespace, key) as MemoryRow | null;
+      .get(key) as MemoryRow | null;
 
     return row ?? undefined;
   }

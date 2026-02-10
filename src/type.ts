@@ -37,12 +37,9 @@ export const MemoryMetaSchma = MemoryMetaSchema
 
 export const MemorySchema = z.object({
   meta: MemoryMetaSchema,
-  domain: z.string(),
   summary: z.string(),
   text: z.string(),
-  type: z.string(),
   links: z.array(MemoryLink),
-  keywords: z.array(z.string()),
 })
 
 export const MemoryNoMetaSchema = MemorySchema.omit({"meta": true})

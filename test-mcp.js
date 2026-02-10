@@ -321,12 +321,9 @@ const run = async () => {
     if (addTool && getTool && updateTool && renameTool) {
       const keySuffix = `${Date.now()}`;
       const baseMemory = {
-        domain: "mcp-test",
         summary: "Initial memory payload",
         text: "Initial memory text",
-        type: "note",
         links: [],
-        keywords: ["mcp", "test"],
       };
 
       const updateKey = `mcp-update-${keySuffix}`;
@@ -392,20 +389,17 @@ const run = async () => {
         `Expected ${updatePayload.text}`,
       );
       assertTrue(
-        "memory_update preserves domain",
-        updatedData.domain === baseMemory.domain,
-        `Expected ${baseMemory.domain}`,
+        "memory_update keeps links array",
+        Array.isArray(updatedData.links),
+        "links should be array",
       );
 
       const renameOldKey = `mcp-rename-old-${keySuffix}`;
       const renameNewKey = `mcp-rename-new-${keySuffix}`;
       const renamePayload = {
-        domain: "mcp-test",
         summary: "Rename memory payload",
         text: "Rename memory text",
-        type: "note",
         links: [],
-        keywords: ["mcp", "rename"],
       };
 
       const addRenameRaw = await runTool(
@@ -480,9 +474,9 @@ const run = async () => {
         `Expected ${renamePayload.text}`,
       );
       assertTrue(
-        "memory_rename preserves domain",
-        renamedData.domain === renamePayload.domain,
-        `Expected ${renamePayload.domain}`,
+        "memory_rename keeps links array",
+        Array.isArray(renamedData.links),
+        "links should be array",
       );
     }
   }

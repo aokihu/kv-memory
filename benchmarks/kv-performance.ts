@@ -76,7 +76,7 @@ export async function runKVPerformanceBenchmark(): Promise<BenchmarkMetric[]> {
   const keyvDbPath = join(tmpdir(), `kv-bench-${Date.now()}.db`);
 
   const keyvImpl = new KeyvMemoryBaseline(namespaceKeyv, keyvDbPath);
-  const sqliteImpl = new KVMemory(namespaceSqlite);
+  const sqliteImpl = new KVMemory();
 
   const records = buildRecords(OPERATIONS);
 
@@ -145,11 +145,8 @@ function buildRecords(count: number): Array<{ key: string; value: MemoryNoMeta }
     items.push({
       key: `k_${index}`,
       value: {
-        domain: "bench",
         summary: `summary-${index}`,
         text: `text-${index}`,
-        type: "decision",
-        keywords: ["bench", `${index}`],
         links: [],
       },
     });

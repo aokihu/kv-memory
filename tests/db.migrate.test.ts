@@ -13,11 +13,8 @@ function makeTempDir(): string {
 function makeMemory(id: string, summary: string, links: Memory["links"] = []): Memory {
   const now = Date.now();
   return {
-    domain: "test",
     summary,
     text: `${summary}-text`,
-    type: "decision",
-    keywords: [summary],
     links,
     meta: {
       id,

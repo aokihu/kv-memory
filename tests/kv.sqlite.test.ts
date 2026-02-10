@@ -16,8 +16,8 @@ function cleanupNamespace(namespace: string): void {
     return;
   }
 
-  database.query(`DELETE FROM memory_links WHERE namespace = ?`).run(namespace);
-  database.query(`DELETE FROM memories WHERE namespace = ?`).run(namespace);
+  database.query(`DELETE FROM memory_links WHERE from_key LIKE ? OR to_key LIKE ?`).run(`${namespace}_%`, `${namespace}_%`);
+  database.query(`DELETE FROM memories WHERE key LIKE ?`).run(`${namespace}_%`);
 }
 
 afterEach(() => {
@@ -28,27 +28,23 @@ afterEach(() => {
 describe("KVMemory sqlite", () => {
   test("add/get stores columns and syncs links to relation table", async () => {
     currentNamespace = makeNamespace();
-    const kv = new KVMemory(currentNamespace);
+    const kv = new KVMemory();
+    const targetKey = `${currentNamespace}_target_1`;
+    const sourceKey = `${currentNamespace}_source_1`;
 
-    await kv.add("target_1", {
-      domain: "test",
+    await kv.add(targetKey, {
       summary: "target summary",
       text: "target text",
-      type: "design",
-      keywords: ["target"],
       links: [],
     });
 
-    await kv.add("source_1", {
-      domain: "test",
+    await kv.add(sourceKey, {
       summary: "source summary",
       text: "source text",
-      type: "decision",
-      keywords: ["source"],
       links: [
         {
           type: "decision",
-          key: "target_1",
+          key: targetKey,
           term: "points to target",
           weight: 0.8,
         },
@@ -60,84 +56,76 @@ describe("KVMemory sqlite", () => {
       ],
     });
 
-    const memory = await kv.get("source_1");
+    const memory = await kv.get(sourceKey);
     expect(memory?.summary).toBe("source summary");
-    expect(memory?.meta.id).toBe("source_1");
+    expect(memory?.meta.id).toBe(sourceKey);
     expect(memory?.links.length).toBe(2);
 
     const linkRows = database
       .query(
-        `SELECT from_key, to_key, link_type FROM memory_links WHERE namespace = ? AND from_key = ? ORDER BY id`,
+        `SELECT from_key, to_key, link_type FROM memory_links WHERE from_key = ? ORDER BY id`,
       )
-      .all(currentNamespace, "source_1") as Array<{ from_key: string; to_key: string; link_type: string }>;
+      .all(sourceKey) as Array<{ from_key: string; to_key: string; link_type: string }>;
 
     expect(linkRows.length).toBe(1);
-    expect(linkRows[0]?.to_key).toBe("target_1");
+    expect(linkRows[0]?.to_key).toBe(targetKey);
     expect(linkRows[0]?.link_type).toBe("decision");
   });
 
   test("update supports partial fields and refreshes relation rows", async () => {
     currentNamespace = makeNamespace();
-    const kv = new KVMemory(currentNamespace);
+    const kv = new KVMemory();
+    const targetAKey = `${currentNamespace}_target_a`;
+    const targetBKey = `${currentNamespace}_target_b`;
+    const sourceKey = `${currentNamespace}_source`;
 
-    await kv.add("target_a", {
-      domain: "test",
+    await kv.add(targetAKey, {
       summary: "target a",
       text: "a",
-      type: "design",
-      keywords: [],
       links: [],
     });
 
-    await kv.add("target_b", {
-      domain: "test",
+    await kv.add(targetBKey, {
       summary: "target b",
       text: "b",
-      type: "design",
-      keywords: [],
       links: [],
     });
 
-    await kv.add("source", {
-      domain: "test",
+    await kv.add(sourceKey, {
       summary: "before",
       text: "keep-text",
-      type: "decision",
-      keywords: ["k1"],
-      links: [{ type: "decision", key: "target_a", term: "a", weight: 0.5 }],
+      links: [{ type: "decision", key: targetAKey, term: "a", weight: 0.5 }],
     });
 
-    await kv.update("source", {
+    await kv.update(sourceKey, {
       summary: "after",
-      links: [{ type: "decision", key: "target_b", term: "b", weight: 0.7 }],
+      links: [{ type: "decision", key: targetBKey, term: "b", weight: 0.7 }],
     });
 
-    const memory = await kv.get("source");
+    const memory = await kv.get(sourceKey);
     expect(memory?.summary).toBe("after");
     expect(memory?.text).toBe("keep-text");
 
     const linkRows = database
-      .query(`SELECT to_key FROM memory_links WHERE namespace = ? AND from_key = ? ORDER BY id`)
-      .all(currentNamespace, "source") as Array<{ to_key: string }>;
+      .query(`SELECT to_key FROM memory_links WHERE from_key = ? ORDER BY id`)
+      .all(sourceKey) as Array<{ to_key: string }>;
 
     expect(linkRows.length).toBe(1);
-    expect(linkRows[0]?.to_key).toBe("target_b");
+    expect(linkRows[0]?.to_key).toBe(targetBKey);
   });
 
   test("setMeta updates meta JSON and created_at column", async () => {
     currentNamespace = makeNamespace();
-    const kv = new KVMemory(currentNamespace);
+    const kv = new KVMemory();
+    const key = `${currentNamespace}_meta_key`;
 
-    await kv.add("meta_key", {
-      domain: "test",
+    await kv.add(key, {
       summary: "summary",
       text: "text",
-      type: "decision",
-      keywords: [],
       links: [],
     });
 
-    const current = await kv.get("meta_key");
+    const current = await kv.get(key);
     if (!current) {
       throw new Error("test setup failed: memory not found");
     }
@@ -148,97 +136,88 @@ describe("KVMemory sqlite", () => {
       created_at: current.meta.created_at + 1,
     };
 
-    await kv.setMeta("meta_key", nextMeta);
+    await kv.setMeta(key, nextMeta);
 
-    const updated = await kv.get("meta_key");
+    const updated = await kv.get(key);
     expect(updated?.meta.access_count).toBe(nextMeta.access_count);
     expect(updated?.meta.created_at).toBe(nextMeta.created_at);
 
     const createdAtRow = database
-      .query(`SELECT created_at FROM memories WHERE namespace = ? AND key = ?`)
-      .get(currentNamespace, "meta_key") as { created_at: number } | null;
+      .query(`SELECT created_at FROM memories WHERE key = ?`)
+      .get(key) as { created_at: number } | null;
 
     expect(createdAtRow?.created_at).toBe(nextMeta.created_at);
   });
 
   test("updateKey migrates key and keeps link relation synchronized", async () => {
     currentNamespace = makeNamespace();
-    const kv = new KVMemory(currentNamespace);
+    const kv = new KVMemory();
+    const targetKey = `${currentNamespace}_target`;
+    const oldKey = `${currentNamespace}_old_key`;
+    const newKey = `${currentNamespace}_new_key`;
+    const inboundKey = `${currentNamespace}_inbound`;
 
-    await kv.add("target", {
-      domain: "test",
+    await kv.add(targetKey, {
       summary: "target",
       text: "target",
-      type: "design",
-      keywords: [],
       links: [],
     });
 
-    await kv.add("old_key", {
-      domain: "test",
+    await kv.add(oldKey, {
       summary: "old",
       text: "old",
-      type: "decision",
-      keywords: [],
-      links: [{ type: "decision", key: "target", term: "to target", weight: 0.5 }],
+      links: [{ type: "decision", key: targetKey, term: "to target", weight: 0.5 }],
     });
 
-    await kv.add("inbound", {
-      domain: "test",
+    await kv.add(inboundKey, {
       summary: "inbound",
       text: "inbound",
-      type: "assumption",
-      keywords: [],
-      links: [{ type: "assumption", key: "old_key", term: "to old key", weight: 0.6 }],
+      links: [{ type: "assumption", key: oldKey, term: "to old key", weight: 0.6 }],
     });
 
-    await kv.updateKey("old_key", "new_key");
+    await kv.updateKey(oldKey, newKey);
 
-    const oldMemory = await kv.get("old_key");
-    const newMemory = await kv.get("new_key");
+    const oldMemory = await kv.get(oldKey);
+    const newMemory = await kv.get(newKey);
     expect(oldMemory).toBeUndefined();
-    expect(newMemory?.meta.id).toBe("new_key");
+    expect(newMemory?.meta.id).toBe(newKey);
 
     const outgoing = database
-      .query(`SELECT to_key FROM memory_links WHERE namespace = ? AND from_key = ?`)
-      .all(currentNamespace, "new_key") as Array<{ to_key: string }>;
+      .query(`SELECT to_key FROM memory_links WHERE from_key = ?`)
+      .all(newKey) as Array<{ to_key: string }>;
     expect(outgoing.length).toBe(1);
-    expect(outgoing[0]?.to_key).toBe("target");
+    expect(outgoing[0]?.to_key).toBe(targetKey);
 
     const incoming = database
-      .query(`SELECT from_key, to_key FROM memory_links WHERE namespace = ? AND from_key = ?`)
-      .all(currentNamespace, "inbound") as Array<{ from_key: string; to_key: string }>;
+      .query(`SELECT from_key, to_key FROM memory_links WHERE from_key = ?`)
+      .all(inboundKey) as Array<{ from_key: string; to_key: string }>;
     expect(incoming.length).toBe(1);
-    expect(incoming[0]?.to_key).toBe("new_key");
+    expect(incoming[0]?.to_key).toBe(newKey);
   });
 
   test("updateKey failure rolls back transaction", async () => {
     currentNamespace = makeNamespace();
-    const kv = new KVMemory(currentNamespace);
+    const kv = new KVMemory();
+    const oldKey = `${currentNamespace}_old_key`;
+    const existingKey = `${currentNamespace}_existing_key`;
 
-    await kv.add("old_key", {
-      domain: "test",
+    await kv.add(oldKey, {
       summary: "old",
       text: "old",
-      type: "decision",
-      keywords: [],
       links: [],
     });
 
-    await kv.add("existing_key", {
-      domain: "test",
+    await kv.add(existingKey, {
       summary: "existing",
       text: "existing",
-      type: "design",
-      keywords: [],
       links: [],
     });
 
-    await expect(kv.updateKey("old_key", "existing_key")).rejects.toThrow();
+    await expect(kv.updateKey(oldKey, existingKey)).rejects.toThrow();
 
-    const oldMemory = await kv.get("old_key");
-    const existingMemory = await kv.get("existing_key");
-    expect(oldMemory?.meta.id).toBe("old_key");
-    expect(existingMemory?.meta.id).toBe("existing_key");
+    const oldMemory = await kv.get(oldKey);
+    const existingMemory = await kv.get(existingKey);
+    expect(oldMemory?.meta.id).toBe(oldKey);
+    expect(existingMemory?.meta.id).toBe(existingKey);
   });
 });

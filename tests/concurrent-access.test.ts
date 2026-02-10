@@ -20,25 +20,22 @@ afterEach(() => {
   if (!namespace) {
     return;
   }
-  db.query("DELETE FROM memory_links WHERE namespace = ?").run(namespace);
-  db.query("DELETE FROM memories WHERE namespace = ?").run(namespace);
+  db.query("DELETE FROM memory_links WHERE from_key LIKE ? OR to_key LIKE ?").run(`${namespace}_%`, `${namespace}_%`);
+  db.query("DELETE FROM memories WHERE key LIKE ?").run(`${namespace}_%`);
   namespace = "";
 });
 
 describe("concurrent access", () => {
   test("parallel add/get across same namespace remains consistent", async () => {
     namespace = makeNamespace();
-    const kv = new KVMemory(namespace);
+    const kv = new KVMemory();
     const total = 120;
 
     await Promise.all(
       Array.from({ length: total }, async (_, index) => {
-        await kv.add(`k_${index}`, {
-          domain: "concurrent",
+        await kv.add(`${namespace}_k_${index}`, {
           summary: `summary-${index}`,
           text: `text-${index}`,
-          type: "decision",
-          keywords: ["concurrent"],
           links: [],
         });
       }),
@@ -46,7 +43,7 @@ describe("concurrent access", () => {
 
     const values = await Promise.all(
       Array.from({ length: total }, async (_, index) => {
-        return await kv.get(`k_${index}`);
+        return await kv.get(`${namespace}_k_${index}`);
       }),
     );
 
@@ -55,26 +52,25 @@ describe("concurrent access", () => {
 
   test("parallel updates on same key keep valid memory object", async () => {
     namespace = makeNamespace();
-    const kv = new KVMemory(namespace);
+    const kv = new KVMemory();
 
-    await kv.add("shared", {
-      domain: "concurrent",
+    const sharedKey = `${namespace}_shared`;
+
+    await kv.add(sharedKey, {
       summary: "initial",
       text: "initial-text",
-      type: "design",
-      keywords: ["shared"],
       links: [],
     });
 
     await Promise.all(
       Array.from({ length: 40 }, async (_, index) => {
-        await kv.update("shared", {
+        await kv.update(sharedKey, {
           summary: `summary-${index}`,
         });
       }),
     );
 
-    const latest = await kv.get("shared");
+    const latest = await kv.get(sharedKey);
     expect(latest).toBeDefined();
     expect(latest?.summary.startsWith("summary-")).toBe(true);
     expect(latest?.text).toBe("initial-text");
@@ -82,27 +78,24 @@ describe("concurrent access", () => {
 
   test("multiple instances concurrently writing same namespace remain readable", async () => {
     namespace = makeNamespace();
-    const instances = [new KVMemory(namespace), new KVMemory(namespace), new KVMemory(namespace)];
+    const instances = [new KVMemory(), new KVMemory(), new KVMemory()];
     const total = 90;
 
     await Promise.all(
       Array.from({ length: total }, async (_, index) => {
         const instance = instances[index % instances.length] as KVMemory;
-        await instance.add(`multi_${index}`, {
-          domain: "concurrent",
+        await instance.add(`${namespace}_multi_${index}`, {
           summary: `multi-summary-${index}`,
           text: `multi-text-${index}`,
-          type: "assumption",
-          keywords: ["multi"],
           links: [],
         });
       }),
     );
 
-    const reader = new KVMemory(namespace);
+    const reader = new KVMemory();
     const rows = await Promise.all(
       Array.from({ length: total }, async (_, index) => {
-        return await reader.get(`multi_${index}`);
+        return await reader.get(`${namespace}_multi_${index}`);
       }),
     );
 

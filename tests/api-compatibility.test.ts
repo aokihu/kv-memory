@@ -20,8 +20,8 @@ afterEach(() => {
   if (!namespace) {
     return;
   }
-  db.query("DELETE FROM memory_links WHERE namespace = ?").run(namespace);
-  db.query("DELETE FROM memories WHERE namespace = ?").run(namespace);
+  db.query("DELETE FROM memory_links WHERE from_key LIKE ? OR to_key LIKE ?").run(`${namespace}_%`, `${namespace}_%`);
+  db.query("DELETE FROM memories WHERE key LIKE ?").run(`${namespace}_%`);
   namespace = "";
 });
 
@@ -29,37 +29,36 @@ describe("api compatibility", () => {
   test("service add/get/update/traverse/updateKey flow remains compatible", async () => {
     namespace = makeNamespace();
     const service = new KVMemoryService();
+    const baseKey = `${namespace}_base`;
+    const renamedKey = `${namespace}_renamed`;
 
-    await service.addMemory(namespace, "base", {
-      domain: "test",
+    await service.addMemory(namespace, baseKey, {
       summary: "base-summary",
       text: "base-text",
-      type: "decision",
-      keywords: ["base"],
       links: [],
     });
 
-    const fetched = await service.getMemory(namespace, "base");
+    const fetched = await service.getMemory(namespace, baseKey);
     expect(fetched).toBeDefined();
     expect(fetched?.summary).toBe("base-summary");
     expect(fetched?.text).toBe("base-text");
 
-    await service.updateMemory(namespace, "base", {
+    await service.updateMemory(namespace, baseKey, {
       summary: "updated-summary",
     });
 
-    const updated = await service.getMemory(namespace, "base");
+    const updated = await service.getMemory(namespace, baseKey);
     expect(updated?.summary).toBe("updated-summary");
     expect(updated?.text).toBe("base-text");
 
-    const traversed = await service.traverseMemory(namespace, "base");
+    const traversed = await service.traverseMemory(namespace, baseKey);
     expect(traversed).toBeDefined();
     expect((traversed?.meta.traverse_count ?? 0) >= 1).toBe(true);
 
-    await service.updateKey(namespace, "base", "renamed");
+    await service.updateKey(namespace, baseKey, renamedKey);
 
-    const oldValue = await service.getMemory(namespace, "base");
-    const renamed = await service.getMemory(namespace, "renamed");
+    const oldValue = await service.getMemory(namespace, baseKey);
+    const renamed = await service.getMemory(namespace, renamedKey);
     expect(oldValue).toBeUndefined();
     expect(renamed?.summary).toBe("updated-summary");
   });

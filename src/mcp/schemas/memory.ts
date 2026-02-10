@@ -7,7 +7,6 @@ export const MemoryLinkInputSchema = MemoryNoMetaSchema.shape.links.element.exte
 
 export const MemoryValueSchema = MemoryNoMetaSchema.extend({
   links: z.array(MemoryLinkInputSchema).optional(),
-  keywords: MemoryNoMetaSchema.shape.keywords.optional(),
 });
 
 export const MemoryAddSchema = z.object({

@@ -150,7 +150,6 @@ memory_score ≤ θ_delete
 
 - memory_score 长期偏低
 - in_degree + out_degree 很小
-- domain 与 type 相同
 - 语义高度重叠（由系统或人工确认）
 
 合并不会自动执行，只生成建议。

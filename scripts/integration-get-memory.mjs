@@ -153,27 +153,21 @@ const run = async () => {
   await requestJson("/add_memory", {
     key: existingKey,
     value: {
-      domain: "integration",
       summary: existingSummary,
       text: "Linked memory for integration test",
-      type: "decision",
       links: [],
-      keywords: ["integration"],
     },
   });
 
   await requestJson("/add_memory", {
     key: mainKey,
     value: {
-      domain: "integration",
       summary: "main memory",
       text: "Used to test links summary behavior",
-      type: "design",
       links: [
         { type: "decision", key: existingKey, term: "related", weight: 0.6 },
         { type: "bug", key: missingKey, term: "missing", weight: 0.4 },
       ],
-      keywords: ["integration"],
     },
   });
 

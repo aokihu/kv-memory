@@ -52,19 +52,16 @@
    }
    
    // 添加记忆
-   {
-     "tool": "memory_add",
-     "arguments": {
-       "key": "decision/42",
-       "value": {
-         "domain": "product",
-         "summary": "将记忆存入 KVDB",
-         "text": "...更长的背景描述...",
-         "type": "decision",
-         "links": [],
-         "keywords": ["决策", "KVDB"]
-       }
-     }
+    {
+      "tool": "memory_add",
+      "arguments": {
+        "key": "decision/42",
+        "value": {
+          "summary": "将记忆存入 KVDB",
+          "text": "...更长的背景描述...",
+          "links": []
+        }
+      }
    }
 
    // 读取记忆
@@ -104,19 +101,14 @@
   {
     "key": "唯一字符串",
     "value": {
-      "domain": "产品/工程等",
       "summary": "1-2 句话的概述",
       "text": "更详细内容",
-      "type": "decision/tool/bug/...",
-      "links": [
-        { "type": "decision", "term": "xxx", "weight": 0.5 }
-      ],
-      "keywords": ["记忆","KVDB"]
+      "links": []
     }
   }
   ```
 
-- **注意**：`links` 与 `keywords` 可省略，服务端会填充空数组再写入。
+- **注意**：`links` 可省略，服务端会填充空数组再写入。
 - **可选参数**：通过 `output_format` 调整工具返回数据格式，支持 `toon`（默认）与 `json`，便于客户端解析。
 - **返回值**：`{ success: true, key: "..." }` 或包含 `message` 的错误对象。
 
@@ -206,7 +198,7 @@
 ### `capture_memory`
 
 - **用途**：提供一个固定 Prompt 模板，引导 LLM 产出合法的 `MemoryNoMeta` JSON。
-- **合同**：提示要求输出字段 `key`、`value.domain`、`value.summary`、`value.text`、`value.type`、`value.links`、`value.keywords`。
+- **合同**：提示要求输出字段 `key`、`value.summary`、`value.text`、`value.links`。
 - **建议**：在 `value.links` 不清楚时返回空数组，后续由工具补全；生成 JSON 后再调用 `memory_add`。
 
 ### `recall_memory`
@@ -249,7 +241,7 @@ bun run mcp
 ```bash
 cat <<'EOF' >/tmp/mcp.cmd
 { "tool": "session_new", "arguments": {} }
-{ "tool": "memory_add", "arguments": { "key": "note/intro", "value": { "domain": "product", "summary": "记录 MCP 说明", "text": "...", "type": "note" } } }
+{ "tool": "memory_add", "arguments": { "key": "note/intro", "value": { "summary": "记录 MCP 说明", "text": "...", "links": [] } } }
 { "tool": "memory_get", "arguments": { "key": "note/intro" } }
 { "tool": "memory_update", "arguments": { "key": "note/intro", "value": { "summary": "调整后的简介", "text": "补充了更多背景" } } }
 { "tool": "memory_rename", "arguments": { "old_key": "note/intro", "new_key": "note/mcp_intro" } }
@@ -267,12 +259,9 @@ cat /tmp/mcp.cmd | bun run mcp
 默认情况下，`memory_get` 返回 TOON 格式：
 
 ```
-domain: product
 summary: 将记忆存入KVDB
 text: ...更长的背景描述...
-type: decision
 links[0]:
-keywords[2]: 决策,KVDB
 ```
 
 如需 JSON 格式，请指定 `output_format` 参数：
@@ -313,7 +302,7 @@ await client.disconnect();
 ## 故障排除
 
 - **`bun run mcp` 失败**：确认 `bun` 版本 >= 1.0、`bun install` 已运行，且 `node_modules` 正常。
-- **`memory_add` 报 `ZodError`**：确保 `value` 包含 `domain`、`summary`、`text`、`type` 等必填字段；`links`/`keywords` 必须是数组。
+- **`memory_add` 报 `ZodError`**：确保 `value` 包含 `summary`、`text` 等必填字段；`links` 必须是数组。
 - **HTTP 连接报 `ECONNREFUSED`**：检查 `MCP_TRANSPORT`、`MCP_PORT` 与 `MCP_ENDPOINT` 是否与客户端一致；若绑定到 `127.0.0.1`，外部无法访问。
 - **Session 失效**：STDIO 模式下保持进程不重启，`session_new` 结果会缓存到全局 `stdioSession`；HTTP 模式建议每次调用后保存响应中的 `session` 字段。
 - **资源 `memory://{key}` 返回 `success: false`**：确认记忆已写入并拼写一致；服务端会将错误文本放在 `message` 字段。

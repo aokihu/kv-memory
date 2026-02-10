@@ -15,7 +15,7 @@ const context: AppServerContext = {
 }
 
 export const server = Bun.serve({
-  port: 3000,
+  port: 8787,
   routes: {
     "/login": { POST: (req) => loginController(req, context) },
     "/get_memory": { POST: (req) => getMemoryController(req, context) },
@@ -30,4 +30,3 @@ export const server = Bun.serve({
     },
   }
 });
-

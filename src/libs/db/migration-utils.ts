@@ -121,7 +121,6 @@ export function buildWritableMigrationData(record: MigratedMemoryRecord): {
     key: record.key,
     memoryColumns: memoryToWritableColumns(record.memory),
     linkRows: linksToRelationRows(
-      record.namespace,
       record.key,
       record.memory.links,
       record.memory.meta.created_at,
@@ -147,20 +146,16 @@ export function validateMigratedRecords(
   for (const record of records) {
     const row = targetDatabase
       .query(
-        `SELECT key, namespace, domain, summary, text, type, keywords, meta, links, created_at
+        `SELECT key, summary, text, meta, links, created_at
          FROM memories
-         WHERE namespace = ? AND key = ?
+         WHERE key = ?
          LIMIT 1`,
       )
-      .get(record.namespace, record.key) as
+      .get(record.key) as
       | {
           key: string;
-          namespace: string;
-          domain: string;
           summary: string;
           text: string;
-          type: string;
-          keywords: string;
           meta: string;
           links: string;
           created_at: number;

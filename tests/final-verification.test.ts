@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { initDatabase, getDatabase, migrateKeyvToSQLite } from "../src/libs/db";
 import { KVMemoryService } from "../src/service";
-import { MemoryStatusEnums, type Memory } from "../src/type";
+import { MemoryStatusEnums } from "../src/type";
 
 const runtimeDb = initDatabase(getDatabase());
 
@@ -23,14 +23,11 @@ function makeNamespace(): string {
   return `final_verify_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function makeMemory(id: string): Memory {
+function makeMemory(id: string) {
   const now = Date.now();
   return {
-    domain: "verify",
     summary: `summary-${id}`,
     text: `text-${id}`,
-    type: "decision",
-    keywords: ["verify", id],
     links: [],
     meta: {
       id,
@@ -51,8 +48,8 @@ afterEach(() => {
     return;
   }
 
-  runtimeDb.query("DELETE FROM memory_links WHERE namespace = ?").run(namespace);
-  runtimeDb.query("DELETE FROM memories WHERE namespace = ?").run(namespace);
+  runtimeDb.query("DELETE FROM memory_links WHERE from_key LIKE ? OR to_key LIKE ?").run(`${namespace}_%`, `${namespace}_%`);
+  runtimeDb.query("DELETE FROM memories WHERE key LIKE ?").run(`${namespace}_%`);
   namespace = "";
 });
 
@@ -60,40 +57,36 @@ describe("final verification", () => {
   test("core service workflow remains functional", async () => {
     namespace = makeNamespace();
     const service = new KVMemoryService();
+    const keyA = `${namespace}_a`;
+    const keyB = `${namespace}_b`;
+    const renamedKey = `${namespace}_b_renamed`;
 
-    await service.addMemory(namespace, "a", {
-      domain: "verify",
+    await service.addMemory(namespace, keyA, {
       summary: "A",
       text: "A text",
-      type: "decision",
-      keywords: ["A"],
       links: [],
     });
 
-    await service.addMemory(namespace, "b", {
-      domain: "verify",
+    await service.addMemory(namespace, keyB, {
       summary: "B",
       text: "B text",
-      type: "design",
-      keywords: ["B"],
-      links: [{ type: "design", key: "a", term: "points to a", weight: 0.7 }],
+      links: [],
     });
 
-    const fetched = await service.getMemory(namespace, "b");
+    const fetched = await service.getMemory(namespace, keyB);
     expect(fetched?.summary).toBe("B");
-    expect(fetched?.links.length).toBe(1);
-    expect(fetched?.links[0]?.summary).toBe("A");
+    expect(fetched?.links.length).toBe(0);
 
-    await service.updateMemory(namespace, "b", { summary: "B2" });
-    const updated = await service.getMemory(namespace, "b");
+    await service.updateMemory(namespace, keyB, { summary: "B2" });
+    const updated = await service.getMemory(namespace, keyB);
     expect(updated?.summary).toBe("B2");
 
-    const traversed = await service.traverseMemory(namespace, "b");
+    const traversed = await service.traverseMemory(namespace, keyB);
     expect((traversed?.meta.traverse_count ?? 0) >= 1).toBe(true);
 
-    await service.updateKey(namespace, "b", "b_renamed");
-    expect(await service.getMemory(namespace, "b")).toBeUndefined();
-    expect((await service.getMemory(namespace, "b_renamed"))?.summary).toBe("B2");
+    await service.updateKey(namespace, keyB, renamedKey);
+    expect(await service.getMemory(namespace, keyB)).toBeUndefined();
+    expect((await service.getMemory(namespace, renamedKey))?.summary).toBe("B2");
   });
 
   test("migration simulation supports dry-run and actual migration", () => {

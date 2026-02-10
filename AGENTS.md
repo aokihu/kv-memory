@@ -1,15 +1,8 @@
 # AGENTS Guide
 
-## Project Overview
-
-本项目实现一个 **Key–Value + Database** 的记忆系统，用于 AI Agent 的长期协作与上下文演化。
-
-### Key–Value 层
-用于存储短期、高频、结构化记忆（如 `decision`、`constraint`、`bug`、`design` 等），支持快速读写与动态演化。
-
-### Database 层
+本项目是使用**sqlite**来实现**Key-Value**模式的，帮助Agent实现记忆的MCP工具.
+用于存储短期、高频、结构化记忆，支持快速读写与动态演化。
 用于存储长期稳定文档（规范、说明、设计文档等），不参与动态记忆代谢。
-
 系统目标不是“记住一切”，而是通过 **结构、行为和时间信号**，使记忆能够自然演化、沉底、合并或淘汰。
 
 ---

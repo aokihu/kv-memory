@@ -48,8 +48,6 @@ describe("记忆系统测试用例", () => {
                 value: {
                     summary: "test_summary",
                     text: "test_value",
-                    domain: "test",
-                    type: "test"
                 },
             }),
         })
@@ -234,8 +232,6 @@ describe("记忆系统测试用例", () => {
                 value: {
                     summary: "rename_summary",
                     text: "rename_text",
-                    domain: "test",
-                    type: "test"
                 },
             }),
         })
@@ -259,8 +255,6 @@ describe("记忆系统测试用例", () => {
                 value: {
                     summary: "rename_conflict_summary",
                     text: "rename_conflict_text",
-                    domain: "test",
-                    type: "test"
                 },
             }),
         })
@@ -284,8 +278,6 @@ describe("记忆系统测试用例", () => {
                 value: {
                     summary: "rename_conflict_source_summary",
                     text: "rename_conflict_source_text",
-                    domain: "test",
-                    type: "test"
                 },
             }),
         })

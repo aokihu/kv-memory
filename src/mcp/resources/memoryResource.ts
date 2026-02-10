@@ -2,11 +2,11 @@ import { KVMemoryService } from "../../service";
 import type { MemoryNoMetaWithLinkSummary } from "../../service/kvmemory";
 
 export const createMemoryResourceTemplate = (
-  kvMemoryService: KVMemoryService
+  kvMemoryService: KVMemoryService,
 ) => ({
   uriTemplate: "memory://{namespace}/{key}",
   name: "KVDB Memory",
-  description: "Read-only access to memory records",
+  description: "只读方式获取记忆数据",
   mimeType: "application/json",
   arguments: [
     {

@@ -18,9 +18,15 @@ import { KVMemoryService, SessionService } from "../service";
 
 export const server = new FastMCP({
   name: "kvdb-mem",
-  version: "0.1.1",
+  version: "0.2.0",
   instructions:
     "使用Key-Value数据库存储记忆,并通过记忆连接(Link)将各个记忆连接起来,模仿人类的记忆连接方式.",
+  health: {
+    enabled: true,
+  },
+  roots: {
+    enabled: false,
+  },
 });
 
 type McpSessionAuth = Record<string, unknown> | undefined;
@@ -29,7 +35,7 @@ type McpToolDefinition = Tool<McpSessionAuth, any>;
 const toolRegistry = new Map<string, McpToolDefinition>();
 
 const pickToolDefinition = <Params extends ToolParameters>(
-  tool: Tool<McpSessionAuth, Params>
+  tool: Tool<McpSessionAuth, Params>,
 ) => ({
   description: tool.description,
   parameters: tool.parameters,
@@ -42,8 +48,14 @@ const kvMemoryService = new KVMemoryService();
 const sessionNewTool = createSessionNewTool(sessionService);
 const memoryAddTool = createMemoryAddTool(sessionService, kvMemoryService);
 const memoryGetTool = createMemoryGetTool(sessionService, kvMemoryService);
-const memoryUpdateTool = createMemoryUpdateTool(sessionService, kvMemoryService);
-const memoryRenameTool = createMemoryRenameTool(sessionService, kvMemoryService);
+const memoryUpdateTool = createMemoryUpdateTool(
+  sessionService,
+  kvMemoryService,
+);
+const memoryRenameTool = createMemoryRenameTool(
+  sessionService,
+  kvMemoryService,
+);
 
 toolRegistry.set(sessionNewTool.name, sessionNewTool);
 toolRegistry.set(memoryAddTool.name, memoryAddTool);
@@ -54,8 +66,14 @@ toolRegistry.set(memoryRenameTool.name, memoryRenameTool);
 server.addTool({ name: "session_new", ...pickToolDefinition(sessionNewTool) });
 server.addTool({ name: "memory_add", ...pickToolDefinition(memoryAddTool) });
 server.addTool({ name: "memory_get", ...pickToolDefinition(memoryGetTool) });
-server.addTool({ name: "memory_update", ...pickToolDefinition(memoryUpdateTool) });
-server.addTool({ name: "memory_rename", ...pickToolDefinition(memoryRenameTool) });
+server.addTool({
+  name: "memory_update",
+  ...pickToolDefinition(memoryUpdateTool),
+});
+server.addTool({
+  name: "memory_rename",
+  ...pickToolDefinition(memoryRenameTool),
+});
 
 const memoryResourceTemplate = createMemoryResourceTemplate(kvMemoryService);
 server.addResourceTemplate({
@@ -93,7 +111,7 @@ Object.assign(
 
 export const startMcpServer = async () => {
   const port = Number(Bun.env.MCP_PORT ?? "8787");
-  const host = Bun.env.MCP_HOST;
+  const host = Bun.env.MCP_HOST ?? "127.0.0.1";
   const endpoint = (Bun.env.MCP_ENDPOINT ?? "/mcp") as `/${string}`;
 
   await server.start({

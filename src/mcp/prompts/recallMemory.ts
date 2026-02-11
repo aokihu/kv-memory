@@ -29,11 +29,12 @@ export const recallMemoryPrompt: InputPrompt<McpSessionAuth, RecallMemoryArgumen
           content: {
             type: "text",
             text:
-              "Recall a memory record by key. Use the memory_get tool with:\n" +
-              `- key: ${key}\n` +
-              "If you do not have a session, call session_new first." +
-              "如果没有设置key,你可以是使用index作为默认key" +
-              "其中保存着你认为的重要的记忆或者具有很好联想能力的记忆条目",
+              "你正在使用 KVDB MCP 工具读取记忆。请严格按以下步骤执行：\n" +
+              "1) 先确保有 session：没有 session 时先调用 session_new。\n" +
+              "2) 调用 memory_get 并传入 key。\n" +
+              "3) key 必须使用 ':' 作为层级分隔符，例如 project:module:topic。\n" +
+              `4) 当前查询 key: ${key}\n` +
+              "如果没有明确 key，使用默认入口 key：index（用于保存高价值或高联想记忆）。",
           },
         },
       ],

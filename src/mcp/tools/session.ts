@@ -8,7 +8,7 @@ import {
 type McpSessionAuth = Record<string, unknown> | undefined;
 
 export const createSessionNewTool = (
-  sessionService: SessionService
+  sessionService: SessionService,
 ): Tool<McpSessionAuth, typeof SessionCreateSchema> => ({
   name: "session_new",
   description: "创建新的session,每个session最多保持3分钟时效",
@@ -16,6 +16,9 @@ export const createSessionNewTool = (
   execute: async (args: SessionCreateInput) => {
     const namespace = args.namespace ?? "mem";
     const sessionKey = await sessionService.generateSession(namespace);
-return sessionKey;
+    return JSON.stringify({
+      success: true,
+      data: { sessionKey, namespace: args.namespace },
+    });
   },
 });

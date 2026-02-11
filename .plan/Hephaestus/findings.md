@@ -1,34 +1,15 @@
-# Findings & Decisions
+# Findings
 
 ## Requirements
-- Create deployment guide, monitoring/logging plan, and rollback plan docs.
-- Create migration rehearsal script for production simulation.
-- Add deployment-related package scripts.
-- Add final verification test covering major workflows.
-- Keep core business implementation files unchanged.
+- 用户要求修改 link 机制：`links` 不应出现在 memory 主体中。
+- Agent 获取 memory 数据时，需基于 `links` 关系表列出关联关系。
+- 用户补充：links 结果中需要显示关联 memory 的 `summary`。
+- 用户确认：数据库不需要向后兼容，旧数据可抛弃。
 
-## Research Findings
-- Existing docs `docs/KEYV_TO_SQLITE_MIGRATION.md` and `docs/PERFORMANCE_BENCHMARK_ANALYSIS.md` provide migration/perf context for deployment docs.
-- `scripts/` currently contains utility scripts; adding shell script is aligned with repository conventions.
-- Rehearsal can be safely implemented by copying source DB and never writing to original source path.
-- Final verification can combine service workflow checks and migration simulation in one isolated test file.
-
-## Technical Decisions
-| Decision | Rationale |
-|----------|-----------|
-| Add `deploy:dry-run` and `deploy:verify` in `package.json` | Standardized operator commands |
-| Rehearsal script runs both dry-run and simulated migration on copied DB | Covers parse-only and full-write paths safely |
-| Final verification test uses temp DB for migration scenario | Ensures no pollution of runtime DB |
-| Keep all changes inside docs/scripts/tests/package scope | Respect task boundary and avoid core logic regressions |
-
-## Issues Encountered
-| Issue | Resolution |
-|-------|------------|
-| None | - |
-
-## Resources
-- `docs/KEYV_TO_SQLITE_MIGRATION.md`
-- `docs/PERFORMANCE_BENCHMARK_ANALYSIS.md`
-- `scripts/`
-- `package.json`
-- `tests/`
+## Discoveries
+- 现有实现为“双写”：`memories.links` JSON 列 + `memory_links` 关系表。
+- 多数读取路径先从 `memories.links` 读 JSON，再在 service 层补充 linked summary。
+- 需要确保迁移与兼容逻辑不会再依赖 `memories.links` 字段。
+- `KVMemory.get()`、`memoryRowToMemory()` 当前返回的 `Memory` 强制包含 `links`，这是主要耦合点。
+- `memory_add`/`addMemoryController` 目前将 links 写入 memory 主体；需改为仅驱动 relation 表。
+- `KVMemoryService.getMemory()` 已通过读取 link 目标 memory 补充 `summary`，满足关联摘要展示需求。

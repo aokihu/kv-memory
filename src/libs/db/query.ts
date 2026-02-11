@@ -5,7 +5,7 @@
  * Debug entry point: inspect `memoryRowToMemory()` when read result looks malformed.
  */
 
-import type { Memory, MemoryMeta } from "../../type";
+import type { Memory, MemoryLinkValue, MemoryMeta } from "../../type";
 import { MemoryLink, MemoryMetaSchema, MemorySchema } from "../../type";
 
 /**
@@ -16,7 +16,6 @@ export type MemoryRow = {
   summary: string;
   text: string;
   meta: string;
-  links: string;
   created_at: number;
 };
 
@@ -27,8 +26,16 @@ export type MemoryLinkRow = {
   from_key: string;
   to_key: string;
   link_type: string;
+  term: string;
   weight: number;
   created_at: number;
+};
+
+export type MemoryLinkRelationReadRow = {
+  to_key: string;
+  link_type: string;
+  term: string;
+  weight: number;
 };
 
 /**
@@ -39,13 +46,11 @@ export type MemoryLinkRow = {
  */
 export function memoryRowToMemory(row: MemoryRow): Memory {
   const meta = MemoryMetaSchema.parse(JSON.parse(row.meta));
-  const links = parseMemoryLinks(row.links);
 
   return MemorySchema.parse({
     meta,
     summary: row.summary,
     text: row.text,
-    links,
   });
 }
 
@@ -58,7 +63,6 @@ export function memoryToWritableColumns(memory: Memory): {
   summary: string;
   text: string;
   meta: string;
-  links: string;
   created_at: number;
 } {
   const validated = MemorySchema.parse(memory);
@@ -67,7 +71,6 @@ export function memoryToWritableColumns(memory: Memory): {
     summary: validated.summary,
     text: validated.text,
     meta: JSON.stringify(validated.meta),
-    links: JSON.stringify(validated.links),
     created_at: validated.meta.created_at,
   };
 }
@@ -75,12 +78,12 @@ export function memoryToWritableColumns(memory: Memory): {
 /**
  * Convert memory links to relation table rows.
  *
- * Trigger condition: synchronize links JSON to `memory_links` table.
+ * Trigger condition: persist link payload to `memory_links` table.
  * Debug hint: links without `key` are intentionally skipped.
  */
 export function linksToRelationRows(
   fromKey: string,
-  links: Memory["links"],
+  links: MemoryLinkValue[],
   createdAt: number,
 ): MemoryLinkRow[] {
   const rows: MemoryLinkRow[] = [];
@@ -95,6 +98,7 @@ export function linksToRelationRows(
       from_key: fromKey,
       to_key: link.key,
       link_type: link.type,
+      term: link.term,
       weight: link.weight,
       created_at: createdAt,
     });
@@ -104,15 +108,15 @@ export function linksToRelationRows(
 }
 
 /**
- * Parse links JSON and validate each link item.
+ * Convert relation table row to memory link payload.
  */
-function parseMemoryLinks(raw: string): Memory["links"] {
-  const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    throw new Error("links column is not an array");
-  }
-
-  return parsed.map((item) => MemoryLink.parse(item));
+export function relationRowToMemoryLink(row: MemoryLinkRelationReadRow): MemoryLinkValue {
+  return MemoryLink.parse({
+    type: row.link_type,
+    key: row.to_key,
+    term: row.term,
+    weight: row.weight,
+  });
 }
 
 /**

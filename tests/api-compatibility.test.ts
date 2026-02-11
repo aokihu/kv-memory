@@ -35,7 +35,6 @@ describe("api compatibility", () => {
     await service.addMemory(namespace, baseKey, {
       summary: "base-summary",
       text: "base-text",
-      links: [],
     });
 
     const fetched = await service.getMemory(namespace, baseKey);

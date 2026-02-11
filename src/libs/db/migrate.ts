@@ -124,14 +124,13 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
 
   runInTransaction(targetDatabase, () => {
     const upsertMemory = targetDatabase.query(
-      `INSERT INTO memories (key, summary, text, meta, links, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO memories (key, summary, text, meta, created_at)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET
            summary = excluded.summary,
            text = excluded.text,
-          meta = excluded.meta,
-          links = excluded.links,
-          created_at = excluded.created_at`,
+           meta = excluded.meta,
+           created_at = excluded.created_at`,
     );
 
     const deleteLinkBySource = targetDatabase.query(
@@ -139,11 +138,11 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
     );
 
     const insertLinkIfTargetExists = targetDatabase.query(
-      `INSERT INTO memory_links (from_key, to_key, link_type, weight, created_at)
-       SELECT ?, ?, ?, ?, ?
-        WHERE EXISTS (
-         SELECT 1 FROM memories m WHERE m.key = ?
-        )`,
+      `INSERT INTO memory_links (from_key, to_key, link_type, term, weight, created_at)
+       SELECT ?, ?, ?, ?, ?, ?
+         WHERE EXISTS (
+          SELECT 1 FROM memories m WHERE m.key = ?
+         )`,
     );
 
     for (const record of records) {
@@ -153,7 +152,6 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
         writable.memoryColumns.summary,
         writable.memoryColumns.text,
         writable.memoryColumns.meta,
-        writable.memoryColumns.links,
         writable.memoryColumns.created_at,
       );
     }
@@ -167,6 +165,7 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
           linkRow.from_key,
           linkRow.to_key,
           linkRow.link_type,
+          linkRow.term,
           linkRow.weight,
           linkRow.created_at,
           linkRow.to_key,
@@ -186,7 +185,7 @@ function upsertMigratedData(targetDatabase: Database, records: MigratedMemoryRec
 function countPotentialLinkRows(records: MigratedMemoryRecord[]): number {
   let count = 0;
   for (const record of records) {
-    for (const link of record.memory.links) {
+    for (const link of record.links) {
       if (link.key) {
         count += 1;
       }

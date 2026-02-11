@@ -1,18 +1,17 @@
 import { z } from "zod";
-import { MemoryNoMetaSchema } from "../../type";
+import { MemoryLink, MemoryNoMetaSchema } from "../../type";
 
-export const MemoryLinkInputSchema = MemoryNoMetaSchema.shape.links.element.extend({
+export const MemoryLinkInputSchema = MemoryLink.extend({
   key: z.string().optional(),
 });
 
-export const MemoryValueSchema = MemoryNoMetaSchema.extend({
-  links: z.array(MemoryLinkInputSchema).optional(),
-});
+export const MemoryValueSchema = MemoryNoMetaSchema;
 
 export const MemoryAddSchema = z.object({
   session: z.string().min(1).optional(),
   key: z.string().min(1),
   value: MemoryValueSchema,
+  links: z.array(MemoryLinkInputSchema).optional(),
   output_format: z.enum(["json", "toon"]).default("toon"),
 });
 
@@ -25,6 +24,7 @@ export const MemoryGetSchema = z.object({
 export const MemoryUpdateSchema = z.object({
   key: z.string().min(1),
   value: MemoryNoMetaSchema.partial(),
+  links: z.array(MemoryLinkInputSchema).optional(),
   session: z.string().min(1).optional(),
   output_format: z.enum(["json", "toon"]).default("toon"),
 });

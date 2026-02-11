@@ -2,10 +2,10 @@
  * 更新记忆控制器
  * @author aokihu <aokihu@gmail.com>
  * @license MIT
- * @description RequestBody.value 使用 Partial<MemoryNoMeta>，关键词和链接可选，拒绝domain和type字段
+ * @description RequestBody.value 使用 Partial<MemoryNoMeta>，链接通过独立links字段提交，拒绝domain和type字段
  */
 import { z } from 'zod'
-import { type AppServerContext, type MemoryNoMeta, MemoryNoMetaSchema } from '../type'
+import { MemoryLink, type AppServerContext, type MemoryNoMeta, MemoryNoMetaSchema } from '../type'
 
 // 拒绝domain和type字段的验证器
 const RejectDomainTypeSchema = z.object({
@@ -17,6 +17,7 @@ const RequestBodySchema = z.object({
     session: z.string(),
     key: z.string(),
     value: MemoryNoMetaSchema.partial().and(RejectDomainTypeSchema),
+    links: z.array(MemoryLink).optional(),
 })
 
 type RequestBody = z.infer<typeof RequestBodySchema>
@@ -36,7 +37,7 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
         return Response.json({ success: false, message: result.error.issues }, { status: 400 });
     }
 
-    const { key, session, value } = result.data;
+    const { key, session, value, links } = result.data;
     
 
     // 验证session
@@ -62,7 +63,7 @@ export const updateMemoryController = async (req: Bun.BunRequest<"/update_memory
     }
 
     // 更新记忆
-    await ctx.kvMemoryService.updateMemory(ns, key, value as Partial<MemoryNoMeta>);
+    await ctx.kvMemoryService.updateMemory(ns, key, value as Partial<MemoryNoMeta>, links);
 
     return Response.json({
         success: true,

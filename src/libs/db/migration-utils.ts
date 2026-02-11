@@ -6,7 +6,7 @@
  */
 
 import type { Database } from "bun:sqlite";
-import { MemorySchema, type Memory } from "../../type";
+import { MemoryLink, MemoryWithLinksSchema, type Memory, type MemoryLinkValue } from "../../type";
 import { linksToRelationRows, memoryToWritableColumns, memoryRowToMemory, type MemoryLinkRow } from "./query";
 
 /**
@@ -24,6 +24,7 @@ export type MigratedMemoryRecord = {
   namespace: string;
   key: string;
   memory: Memory;
+  links: MemoryLinkValue[];
 };
 
 /**
@@ -63,13 +64,18 @@ export function parseNamespacedKey(rawKey: string): { namespace: string; key: st
 export function parseKeyvRowToMemoryRecord(row: KeyvRow): MigratedMemoryRecord {
   const parsedValue = JSON.parse(row.value) as unknown;
   const unwrapped = unwrapKeyvValue(parsedValue);
-  const memory = MemorySchema.parse(unwrapped);
+  const memoryWithLinks = MemoryWithLinksSchema.parse(unwrapped);
   const parsedKey = parseNamespacedKey(row.key);
 
   return {
     namespace: parsedKey.namespace,
     key: parsedKey.key,
-    memory,
+    memory: {
+      summary: memoryWithLinks.summary,
+      text: memoryWithLinks.text,
+      meta: memoryWithLinks.meta,
+    },
+    links: memoryWithLinks.links,
   };
 }
 
@@ -120,9 +126,9 @@ export function buildWritableMigrationData(record: MigratedMemoryRecord): {
     namespace: record.namespace,
     key: record.key,
     memoryColumns: memoryToWritableColumns(record.memory),
-    linkRows: linksToRelationRows(
+      linkRows: linksToRelationRows(
       record.key,
-      record.memory.links,
+      record.links,
       record.memory.meta.created_at,
     ),
   };
@@ -146,10 +152,10 @@ export function validateMigratedRecords(
   for (const record of records) {
     const row = targetDatabase
       .query(
-        `SELECT key, summary, text, meta, links, created_at
-         FROM memories
-         WHERE key = ?
-         LIMIT 1`,
+        `SELECT key, summary, text, meta, created_at
+          FROM memories
+          WHERE key = ?
+          LIMIT 1`,
       )
       .get(record.key) as
       | {
@@ -157,7 +163,6 @@ export function validateMigratedRecords(
           summary: string;
           text: string;
           meta: string;
-          links: string;
           created_at: number;
         }
       | null;
@@ -168,7 +173,9 @@ export function validateMigratedRecords(
     }
 
     const targetMemory = memoryRowToMemory(row);
-    if (!areMemoriesEqual(record.memory, targetMemory)) {
+    const targetLinks = readRelationLinks(targetDatabase, record.key);
+    const sourceRelationLinks = record.links.filter((link) => Boolean(link.key));
+    if (!areMemoriesEqual(record.memory, targetMemory, sourceRelationLinks, targetLinks)) {
       mismatches.push(`${record.namespace}:${record.key} content mismatch`);
     }
   }
@@ -178,6 +185,27 @@ export function validateMigratedRecords(
     matched: records.length - mismatches.length,
     mismatches,
   };
+}
+
+/**
+ * Read relation links for one source key.
+ */
+function readRelationLinks(targetDatabase: Database, fromKey: string): MemoryLinkValue[] {
+  const rows = targetDatabase
+    .query(
+      `SELECT to_key, link_type, term, weight
+       FROM memory_links
+       WHERE from_key = ?
+       ORDER BY id`,
+    )
+    .all(fromKey) as Array<{ to_key: string; link_type: string; term: string; weight: number }>;
+
+  return rows.map((row) => MemoryLink.parse({
+    type: row.link_type,
+    key: row.to_key,
+    term: row.term,
+    weight: row.weight,
+  }));
 }
 
 /**
@@ -199,6 +227,60 @@ function unwrapKeyvValue(parsedValue: unknown): unknown {
 /**
  * Compare memory payloads deterministically.
  */
-function areMemoriesEqual(a: Memory, b: Memory): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+function areMemoriesEqual(a: Memory, b: Memory, aLinks: MemoryLinkValue[], bLinks: MemoryLinkValue[]): boolean {
+  if (a.summary !== b.summary || a.text !== b.text) {
+    return false;
+  }
+
+  if (
+    a.meta.id !== b.meta.id
+    || a.meta.created_at !== b.meta.created_at
+    || a.meta.last_accessed_at !== b.meta.last_accessed_at
+    || a.meta.last_linked_at !== b.meta.last_linked_at
+    || a.meta.in_degree !== b.meta.in_degree
+    || a.meta.out_degree !== b.meta.out_degree
+    || a.meta.access_count !== b.meta.access_count
+    || a.meta.traverse_count !== b.meta.traverse_count
+    || a.meta.status !== b.meta.status
+  ) {
+    return false;
+  }
+
+  const normalize = (links: MemoryLinkValue[]) => {
+    return links
+      .filter((link) => Boolean(link.key))
+      .map((link) => ({
+        type: link.type,
+        key: link.key as string,
+        term: link.term,
+        weight: link.weight,
+      }))
+      .sort((left, right) => {
+        const leftKey = `${left.key}:${left.type}:${left.term}`;
+        const rightKey = `${right.key}:${right.type}:${right.term}`;
+        return leftKey.localeCompare(rightKey);
+      });
+  };
+
+  const leftLinks = normalize(aLinks);
+  const rightLinks = normalize(bLinks);
+
+  if (leftLinks.length !== rightLinks.length) {
+    return false;
+  }
+
+  for (let index = 0; index < leftLinks.length; index += 1) {
+    const left = leftLinks[index]!;
+    const right = rightLinks[index]!;
+    if (
+      left.type !== right.type
+      || left.key !== right.key
+      || left.term !== right.term
+      || Math.abs(left.weight - right.weight) > 1e-9
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }

@@ -1,57 +1,25 @@
-# Task Plan: KV-SQLITE-6.1-6.5 Deployment Preparation
+# Task Plan
 
 ## Goal
-Complete deployment readiness artifacts (guide, monitoring, rollback, rehearsal script, scripts, final verification tests) without modifying validated core implementations.
+调整 link 机制：memory 实体不再携带 links 字段；读取 memory 时由 links 关系表组装并返回关联关系。
 
-## Current Phase
-Phase 6
+## Steps
+1. 审查当前 memory/links 数据模型与读写链路，定位 links 在 memory 中的耦合点。
+2. 更新类型与数据库读写逻辑，使 memory 主体不再存储 links 字段。
+3. 更新查询/服务层：读取 memory 时从 links 表装配关联关系返回给 Agent。
+4. 对接入口层（controller/mcp schema/tool/prompt）以匹配新输入输出结构。
+5. 更新相关测试并运行目标测试验证行为。
 
-## Phases
-### Phase 1: Requirements & Discovery
-- [x] Read current migration/performance docs and script conventions
-- [x] Confirm allowed file scope and blocked modules
-- [x] Define final verification coverage scope
-- **Status:** complete
-
-### Phase 2: Deployment Docs
-- [x] Create `docs/DEPLOYMENT_GUIDE.md`
-- [x] Create `docs/MONITORING_AND_LOGGING.md`
-- [x] Create `docs/ROLLBACK_PLAN.md`
-- **Status:** complete
-
-### Phase 3: Rehearsal Script
-- [x] Create `scripts/migration-dry-run.sh`
-- [x] Add safe guards and dry-run behavior
-- [x] Make script executable
-- **Status:** complete
-
-### Phase 4: Package Scripts
-- [x] Update `package.json` with deployment scripts
-- [x] Keep scripts aligned with existing commands
-- **Status:** complete
-
-### Phase 5: Final Verification Test
-- [x] Add final verification test file covering major workflows
-- [x] Ensure test is isolated and cleanup-safe
-- [x] Avoid changes to core business code
-- **Status:** complete
-
-### Phase 6: Validation & Delivery
-- [x] Run deployment rehearsal script in simulation
-- [x] Run tests and TypeScript compile
-- [x] Confirm docs/scripts are executable and accurate
-- **Status:** complete
-
-## Key Questions
-1. Final verification test should focus on service-level workflow plus migration dry-run coverage?
-2. Deployment scripts should default to non-destructive dry-run mode only?
-
-## Decisions Made
-| Decision | Rationale |
-|----------|-----------|
-| Add deployment-only artifacts in docs/scripts/tests/package scope | Matches explicit allowed range |
+## Status
+- [completed] Step 1
+- [completed] Step 2
+- [completed] Step 3
+- [completed] Step 4
+- [completed] Step 5
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
-|-------|---------|------------|
-| None | 1 | - |
+|---|---:|---|
+| session-catchup.py not found at expected path | 1 | Continue with manual planning files in `.plan/Hephaestus/` |
+| `bun test` failed with `EADDRINUSE` on port 8787 | 1 | Ran targeted test files that cover modified paths; all passed |
+| migration compatibility tests mismatch after schema decoupling | 1 | User confirmed old DB compatibility can be dropped; keep focus on current runtime path |

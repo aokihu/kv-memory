@@ -59,33 +59,8 @@ export function initDatabase(db: Database): Database {
 
 export function initSchema(db: Database) {
   ensureMemoriesTable(db);
-
-  // Key-value cache for non-memory storage
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS kv_cache (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER
-    )
-  `);
-
-  // Links between memories (associative network)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS memory_links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      from_key TEXT NOT NULL,
-      to_key TEXT NOT NULL,
-      link_type TEXT DEFAULT 'association',
-      weight REAL DEFAULT 0.5,
-      created_at INTEGER NOT NULL,
-      access_count INTEGER DEFAULT 0,
-      last_accessed_at INTEGER,
-      UNIQUE(from_key, to_key, link_type),
-      FOREIGN KEY (from_key) REFERENCES memories(key) ON DELETE CASCADE,
-      FOREIGN KEY (to_key) REFERENCES memories(key) ON DELETE CASCADE
-    )
-  `);
+  ensureMemoryLinksTable(db);
+  ensureKvCacheTable(db);
 
   // Query performance indexes for common lookup paths.
   db.exec(`
@@ -129,7 +104,7 @@ function ensureMemoriesTable(db: Database): void {
 
   const columns = db.query("PRAGMA table_info(memories)").all() as SqliteTableColumn[];
   const columnNames = new Set(columns.map((column) => column.name));
-  const requiredColumns = ["key", "summary", "text", "meta", "links", "created_at"];
+  const requiredColumns = ["key", "summary", "text", "meta", "created_at"];
   const hasRequiredShape = requiredColumns.every((column) => columnNames.has(column));
   const hasNamespaceColumn = columnNames.has("namespace");
 
@@ -137,7 +112,7 @@ function ensureMemoriesTable(db: Database): void {
     return;
   }
 
-  migrateLegacyMemoriesTable(db);
+  resetMemoriesTable(db);
 }
 
 /**
@@ -150,126 +125,68 @@ function createMemoriesTable(db: Database): void {
       summary TEXT NOT NULL,
       text TEXT NOT NULL,
       meta TEXT NOT NULL,
-      links TEXT NOT NULL DEFAULT '[]',
       created_at INTEGER NOT NULL
     )
   `);
 }
 
 /**
- * Migrate legacy `memories` schema (including optional namespace/content fields) to canonical shape.
- *
- * Debug tip: if migrated old rows become unreadable, inspect generated `meta` JSON in this function.
+ * Ensure `memory_links` table exists and includes required columns.
  */
-function migrateLegacyMemoriesTable(db: Database): void {
-  const legacyRows = db.query("SELECT * FROM memories").all() as Array<Record<string, unknown>>;
+function ensureMemoryLinksTable(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS memory_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_key TEXT NOT NULL,
+      to_key TEXT NOT NULL,
+      link_type TEXT DEFAULT 'association',
+      term TEXT NOT NULL DEFAULT '',
+      weight REAL DEFAULT 0.5,
+      created_at INTEGER NOT NULL,
+      access_count INTEGER DEFAULT 0,
+      last_accessed_at INTEGER,
+      UNIQUE(from_key, to_key, link_type),
+      FOREIGN KEY (from_key) REFERENCES memories(key) ON DELETE CASCADE,
+      FOREIGN KEY (to_key) REFERENCES memories(key) ON DELETE CASCADE
+    )
+  `);
 
+  const columns = db.query("PRAGMA table_info(memory_links)").all() as SqliteTableColumn[];
+  const columnNames = new Set(columns.map((column) => column.name));
+  if (!columnNames.has("term")) {
+    db.exec("ALTER TABLE memory_links ADD COLUMN term TEXT NOT NULL DEFAULT ''");
+  }
+}
+
+/**
+ * Ensure key-value cache table exists.
+ */
+function ensureKvCacheTable(db: Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS kv_cache (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER
+    )
+  `);
+}
+
+/**
+ * Reset incompatible `memories` table without migrating old data.
+ *
+ * This project intentionally drops old database records when schema changes.
+ */
+function resetMemoriesTable(db: Database): void {
   db.exec("PRAGMA foreign_keys = OFF");
 
   try {
     db.exec("DROP TABLE IF EXISTS memory_links");
-    db.exec("ALTER TABLE memories RENAME TO memories_legacy");
+    db.exec("DROP TABLE IF EXISTS memories");
     createMemoriesTable(db);
-
-    const insertMemory = db.query(
-      `INSERT INTO memories (key, summary, text, meta, links, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    );
-
-    for (const row of legacyRows) {
-      const key = typeof row.key === "string" ? row.key : "";
-      if (!key) {
-        continue;
-      }
-
-      const createdAt = toNumber(row.created_at, Date.now());
-      const summary = toStringValue(row.summary, "");
-      const text = toStringValue(row.text ?? row.content, "");
-      const links = toJsonArrayString(row.links);
-      const meta = toMetaJsonString(row, key, createdAt);
-
-      insertMemory.run(key, summary, text, meta, links, createdAt);
-    }
-
-    db.exec("DROP TABLE memories_legacy");
   } finally {
     db.exec("PRAGMA foreign_keys = ON");
   }
-}
-
-/**
- * Convert unknown value to number with default fallback.
- */
-function toNumber(value: unknown, fallback: number): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return fallback;
-}
-
-/**
- * Convert unknown value to string with fallback.
- */
-function toStringValue(value: unknown, fallback: string): string {
-  return typeof value === "string" ? value : fallback;
-}
-
-/**
- * Normalize array-like JSON column text. Invalid input falls back to empty array.
- */
-function toJsonArrayString(value: unknown): string {
-  if (typeof value !== "string") {
-    return "[]";
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return value;
-    }
-  } catch {
-    // Invalid JSON should not block migration; fallback keeps row readable.
-  }
-
-  return "[]";
-}
-
-/**
- * Build valid MemoryMeta JSON for migrated rows.
- */
-function toMetaJsonString(row: Record<string, unknown>, key: string, createdAt: number): string {
-  if (typeof row.meta === "string") {
-    try {
-      const parsed = JSON.parse(row.meta) as Record<string, unknown>;
-      if (parsed && typeof parsed.id === "string") {
-        return row.meta;
-      }
-    } catch {
-      // Fall through to regenerated meta payload.
-    }
-  }
-
-  const now = Date.now();
-  const meta = {
-    id: key,
-    created_at: createdAt,
-    last_accessed_at: toNumber(row.last_accessed_at, createdAt),
-    last_linked_at: toNumber(row.last_linked_at, createdAt),
-    in_degree: toNumber(row.in_degree, 0),
-    out_degree: toNumber(row.out_degree, 0),
-    access_count: toNumber(row.access_count, 0),
-    traverse_count: toNumber(row.traverse_count, 0),
-    status: toStringValue(row.status, "active"),
-    migrated_at: now,
-  };
-
-  return JSON.stringify(meta);
 }
 
 /**

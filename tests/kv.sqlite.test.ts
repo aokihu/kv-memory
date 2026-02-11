@@ -35,31 +35,31 @@ describe("KVMemory sqlite", () => {
     await kv.add(targetKey, {
       summary: "target summary",
       text: "target text",
-      links: [],
     });
 
     await kv.add(sourceKey, {
       summary: "source summary",
       text: "source text",
-      links: [
-        {
-          type: "decision",
-          key: targetKey,
-          term: "points to target",
-          weight: 0.8,
-        },
-        {
-          type: "design",
-          term: "no key link",
-          weight: 0.2,
-        },
-      ],
-    });
+    }, [
+      {
+        type: "decision",
+        key: targetKey,
+        term: "points to target",
+        weight: 0.8,
+      },
+      {
+        type: "design",
+        term: "no key link",
+        weight: 0.2,
+      },
+    ]);
 
     const memory = await kv.get(sourceKey);
     expect(memory?.summary).toBe("source summary");
     expect(memory?.meta.id).toBe(sourceKey);
-    expect(memory?.links.length).toBe(2);
+
+    const links = await kv.getLinks(sourceKey);
+    expect(links.length).toBe(1);
 
     const linkRows = database
       .query(
@@ -82,25 +82,21 @@ describe("KVMemory sqlite", () => {
     await kv.add(targetAKey, {
       summary: "target a",
       text: "a",
-      links: [],
     });
 
     await kv.add(targetBKey, {
       summary: "target b",
       text: "b",
-      links: [],
     });
 
     await kv.add(sourceKey, {
       summary: "before",
       text: "keep-text",
-      links: [{ type: "decision", key: targetAKey, term: "a", weight: 0.5 }],
-    });
+    }, [{ type: "decision", key: targetAKey, term: "a", weight: 0.5 }]);
 
     await kv.update(sourceKey, {
       summary: "after",
-      links: [{ type: "decision", key: targetBKey, term: "b", weight: 0.7 }],
-    });
+    }, [{ type: "decision", key: targetBKey, term: "b", weight: 0.7 }]);
 
     const memory = await kv.get(sourceKey);
     expect(memory?.summary).toBe("after");
@@ -122,7 +118,6 @@ describe("KVMemory sqlite", () => {
     await kv.add(key, {
       summary: "summary",
       text: "text",
-      links: [],
     });
 
     const current = await kv.get(key);
@@ -160,20 +155,17 @@ describe("KVMemory sqlite", () => {
     await kv.add(targetKey, {
       summary: "target",
       text: "target",
-      links: [],
     });
 
     await kv.add(oldKey, {
       summary: "old",
       text: "old",
-      links: [{ type: "decision", key: targetKey, term: "to target", weight: 0.5 }],
-    });
+    }, [{ type: "decision", key: targetKey, term: "to target", weight: 0.5 }]);
 
     await kv.add(inboundKey, {
       summary: "inbound",
       text: "inbound",
-      links: [{ type: "assumption", key: oldKey, term: "to old key", weight: 0.6 }],
-    });
+    }, [{ type: "assumption", key: oldKey, term: "to old key", weight: 0.6 }]);
 
     await kv.updateKey(oldKey, newKey);
 
@@ -204,13 +196,11 @@ describe("KVMemory sqlite", () => {
     await kv.add(oldKey, {
       summary: "old",
       text: "old",
-      links: [],
     });
 
     await kv.add(existingKey, {
       summary: "existing",
       text: "existing",
-      links: [],
     });
 
     await expect(kv.updateKey(oldKey, existingKey)).rejects.toThrow();

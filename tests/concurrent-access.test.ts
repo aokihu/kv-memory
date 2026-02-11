@@ -36,7 +36,6 @@ describe("concurrent access", () => {
         await kv.add(`${namespace}_k_${index}`, {
           summary: `summary-${index}`,
           text: `text-${index}`,
-          links: [],
         });
       }),
     );
@@ -59,7 +58,6 @@ describe("concurrent access", () => {
     await kv.add(sharedKey, {
       summary: "initial",
       text: "initial-text",
-      links: [],
     });
 
     await Promise.all(
@@ -87,7 +85,6 @@ describe("concurrent access", () => {
         await instance.add(`${namespace}_multi_${index}`, {
           summary: `multi-summary-${index}`,
           text: `multi-text-${index}`,
-          links: [],
         });
       }),
     );

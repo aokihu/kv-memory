@@ -8,10 +8,12 @@ export {
   memoryRowToMemory,
   memoryToWritableColumns,
   linksToRelationRows,
+  relationRowToMemoryLink,
   mergeMemoryPatch,
   withRenamedMetaId,
   type MemoryRow,
   type MemoryLinkRow,
+  type MemoryLinkRelationReadRow,
 } from "./query";
 export { runInTransaction } from "./transaction";
 export { backupDatabaseFile, type BackupResult } from "./backup";

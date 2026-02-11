@@ -25,9 +25,9 @@ export const createMemoryResourceTemplate = (
     const key = args.key as string;
     try {
       const memory: MemoryNoMetaWithLinkSummary | undefined =
-        await kvMemoryService.getMemory(namespace, key);
+        await kvMemoryService.getMemory(key);
       return {
-        uri: `memory://${namespace}/${key}`,
+        uri: `memory://${key}`,
         text: JSON.stringify(memory, null, 2),
       };
     } catch (error) {

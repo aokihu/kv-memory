@@ -13,7 +13,11 @@ import {
   createSessionNewTool,
 } from "./tools";
 import { createMemoryResourceTemplate } from "./resources";
-import { captureMemoryPrompt, recallMemoryPrompt } from "./prompts";
+import {
+  captureMemoryPrompt,
+  recallMemoryPrompt,
+  initMemoryPrompt,
+} from "./prompts";
 import { KVMemoryService, SessionService } from "../service";
 
 export const server = new FastMCP({
@@ -96,6 +100,12 @@ server.addPrompt({
   description: recallMemoryPrompt.description,
   arguments: recallMemoryPrompt.arguments,
   load: recallMemoryPrompt.load,
+});
+server.addPrompt({
+  name: "memory_init",
+  description: initMemoryPrompt.description,
+  arguments: initMemoryPrompt.arguments,
+  load: initMemoryPrompt.load,
 });
 
 Object.assign(

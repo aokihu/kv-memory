@@ -9,6 +9,7 @@ import type { Database } from "bun:sqlite";
 import {
   MemoryNoMetaSchema,
   MemoryStatusEnums,
+  type MemoryLinkValue,
   type Memory,
   type MemoryMeta,
   type MemoryNoMeta,
@@ -19,9 +20,11 @@ import {
   linksToRelationRows,
   memoryRowToMemory,
   memoryToWritableColumns,
+  relationRowToMemoryLink,
   mergeMemoryPatch,
   runInTransaction,
   withRenamedMetaId,
+  type MemoryLinkRelationReadRow,
   type MemoryRow,
 } from "../db";
 
@@ -37,7 +40,7 @@ export class KVMemory {
     this._database.run("PRAGMA busy_timeout = 5000;");
   }
 
-  async add(key: string, arg: MemoryNoMeta) {
+  async add(key: string, arg: MemoryNoMeta, links: MemoryLinkValue[] = []) {
     const payload = MemoryNoMetaSchema.parse(arg);
     const now = Date.now();
 
@@ -65,19 +68,18 @@ export class KVMemory {
       this._database
         .query(
           `INSERT OR REPLACE INTO memories
-           (key, summary, text, meta, links, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           (key, summary, text, meta, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
         )
         .run(
           key,
           writable.summary,
           writable.text,
           writable.meta,
-          writable.links,
           writable.created_at,
         );
 
-      this.replaceLinkRelations(key, memory.links, memory.meta.created_at);
+      this.replaceLinkRelations(key, links, memory.meta.created_at);
     });
   }
 
@@ -88,6 +90,19 @@ export class KVMemory {
     }
 
     return memoryRowToMemory(row);
+  }
+
+  async getLinks(key: string): Promise<MemoryLinkValue[]> {
+    const rows = this._database
+      .query(
+        `SELECT to_key, link_type, term, weight
+         FROM memory_links
+         WHERE from_key = ?
+         ORDER BY id`,
+      )
+      .all(key) as MemoryLinkRelationReadRow[];
+
+    return rows.map((row) => relationRowToMemoryLink(row));
   }
 
   async setMeta(key: string, meta: MemoryMeta) {
@@ -105,14 +120,16 @@ export class KVMemory {
 
     runInTransaction(this._database, () => {
       this._database
-        .query(
-          `UPDATE memories SET meta = ?, created_at = ? WHERE key = ?`,
-        )
+        .query(`UPDATE memories SET meta = ?, created_at = ? WHERE key = ?`)
         .run(writable.meta, writable.created_at, key);
     });
   }
 
-  async update(key: string, arg: Partial<Memory>) {
+  async update(
+    key: string,
+    arg: Partial<MemoryNoMeta>,
+    links?: MemoryLinkValue[],
+  ) {
     const current = this.getMemoryRow(key);
     if (!current) {
       throw new Error(`KVMemory: update: key ${key} not found`);
@@ -126,23 +143,20 @@ export class KVMemory {
       this._database
         .query(
           `UPDATE memories
-           SET summary = ?, text = ?, meta = ?, links = ?, created_at = ?
+           SET summary = ?, text = ?, meta = ?, created_at = ?
            WHERE key = ?`,
         )
         .run(
           writable.summary,
           writable.text,
           writable.meta,
-          writable.links,
           writable.created_at,
           key,
         );
 
-      this.replaceLinkRelations(
-        key,
-        updatedMemory.links,
-        updatedMemory.meta.created_at,
-      );
+      if (links) {
+        this.replaceLinkRelations(key, links, updatedMemory.meta.created_at);
+      }
     });
   }
 
@@ -164,15 +178,14 @@ export class KVMemory {
       this._database
         .query(
           `INSERT INTO memories
-           (key, summary, text, meta, links, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           (key, summary, text, meta, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
         )
         .run(
           newKey,
           writable.summary,
           writable.text,
           writable.meta,
-          writable.links,
           writable.created_at,
         );
 
@@ -193,23 +206,18 @@ export class KVMemory {
         )
         .run(newKey, oldKey);
 
-      this._database
-        .query(`DELETE FROM memories WHERE key = ?`)
-        .run(oldKey);
-
-      // Rebuild outgoing links from JSON to guarantee row-level consistency.
-      this.replaceLinkRelations(newKey, updated.links, updated.meta.created_at);
+      this._database.query(`DELETE FROM memories WHERE key = ?`).run(oldKey);
     });
   }
 
   /**
-   * Replace link rows for one memory by current JSON links.
+   * Replace relation rows for one memory by provided links.
    *
    * Debug hint: if relation table misses expected rows, inspect `existsMemory()` filter.
    */
   private replaceLinkRelations(
     fromKey: string,
-    links: Memory["links"],
+    links: MemoryLinkValue[],
     createdAt: number,
   ): void {
     this._database
@@ -222,12 +230,12 @@ export class KVMemory {
     }
 
     const insertLinkStatement = this._database.query(
-      `INSERT INTO memory_links (from_key, to_key, link_type, weight, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO memory_links (from_key, to_key, link_type, term, weight, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     );
 
     for (const row of rows) {
-      // Skip dangling target keys to keep backward compatibility with JSON links.
+      // Skip dangling target keys to keep relation rows valid.
       if (!this.existsMemory(row.to_key)) {
         continue;
       }
@@ -236,6 +244,7 @@ export class KVMemory {
         row.from_key,
         row.to_key,
         row.link_type,
+        row.term,
         row.weight,
         row.created_at,
       );
@@ -259,7 +268,7 @@ export class KVMemory {
   private getMemoryRow(key: string): MemoryRow | undefined {
     const row = this._database
       .query(
-        `SELECT key, summary, text, meta, links, created_at
+        `SELECT key, summary, text, meta, created_at
          FROM memories
          WHERE key = ?
          LIMIT 1`,

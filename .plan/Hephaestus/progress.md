@@ -21,3 +21,13 @@
 - 已接收新约束：放弃历史数据库兼容，schema 不兼容时直接重建 memories/memory_links。
 - 测试：`bun test tests/kv.sqlite.test.ts tests/concurrent-access.test.ts tests/api-compatibility.test.ts` 通过。
 - 按最新要求更新 MCP prompt：明确 session_new/memory_add/memory_get 使用步骤，并强调 key 必须使用 ':' 作为分隔符。
+
+## 2026-02-11 (端口修复)
+- 已按要求修改 `src/index.ts` 第 18 行：`port: 8787` -> `port: 3030`。
+- 已验证 `updateMemoryKeyController` 导入与 `/update_memory_key` 路由使用一致，导入正确。
+- 运行 `bunx tsc --noEmit` 时存在与本次改动无关的既有类型错误（controller 参数签名不匹配）。
+
+## 2026-02-12 (端口修复技术验证)
+- 编译检查：`bunx tsc --noEmit` 仍失败，报错集中在 `src/controller/*` 的 TS2554 参数签名不匹配。
+- 端口检查：`ss -ltn` 未发现 `3030` 被占用；发现 `8787` 当前被其他进程监听。
+- 启动验证：启动 `bun run ./src/index.ts` 后，请求 `POST http://127.0.0.1:3030/login` 返回 `400`，说明服务在 `3030` 成功监听并响应。

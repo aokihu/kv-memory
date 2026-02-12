@@ -1,0 +1,66 @@
+{
+  "dataset": "diverse-memories",
+  "description": "General mixed-language and mixed-shape records for search dataset validation.",
+  "records": [
+    {
+      "key": "test:search:diverse:001",
+      "summary": "Redis cache invalidation strategy",
+      "text": "Use TTL + event-driven invalidation for session cache and hot key refresh in production."
+    },
+    {
+      "key": "test:search:diverse:002",
+      "summary": "中文搜索-量子计算",
+      "text": "量子计算中的量子比特需要保持相干性，搜索关键词：量子 比特 相干。"
+    },
+    {
+      "key": "test:search:diverse:003",
+      "summary": "Bilingual API design note",
+      "text": "接口约定 include trace_id, retry_count, and error_code，便于 debug 与 observability。"
+    },
+    {
+      "key": "test:search:diverse:004",
+      "summary": "short",
+      "text": "ok"
+    },
+    {
+      "key": "test:search:diverse:005",
+      "summary": "Long memory for excerpt generation",
+      "text": "This is a long-form memory block for search relevance testing. It includes repeated markers alpha beta gamma and Chinese token 中文检索 to ensure snippet extraction behaves consistently across long text content with mixed language and punctuation. Additional context: paging, ranking, filtering, and stable test replay."
+    },
+    {
+      "key": "test:search:diverse:006",
+      "summary": "Special chars set A",
+      "text": "symbols: ! @ # $ % ^ & * ( ) _ + - = [ ] { } ; : ' \" , . < > / ? | \\"
+    },
+    {
+      "key": "test:search:diverse:007",
+      "summary": "Special chars set B",
+      "text": "escaped patterns: regex ^alpha.*beta$, path /var/log/app.log, url https://example.com?q=fts5&lang=zh-CN"
+    },
+    {
+      "key": "test:search:diverse:008",
+      "summary": "Emoji and unicode",
+      "text": "status green check ✅, warning ⚠, rocket 🚀, mixed with keyword optimization and 中文优化。"
+    },
+    {
+      "key": "test:search:diverse:009",
+      "summary": "Database tuning",
+      "text": "SQLite pragma journal_mode=WAL; tune synchronous=NORMAL for write-heavy benchmark testing."
+    },
+    {
+      "key": "test:search:diverse:010",
+      "summary": "Edge punctuation",
+      "text": "question??? answer!!! semicolon;;; comma,,, dot... mix---dash___underscore"
+    },
+    {
+      "key": "test:search:diverse:011",
+      "summary": "Case sensitivity check",
+      "text": "Token Alpha alpha ALPHA should be searchable regardless of letter case behavior."
+    },
+    {
+      "key": "test:search:diverse:012",
+      "summary": "Multiline-like sentence",
+      "text": "line1 keyword memory. line2 中文关键字 检索. line3 fts search ranking."
+    }
+  ]
+}

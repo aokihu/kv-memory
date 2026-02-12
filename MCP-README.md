@@ -177,6 +177,130 @@
 
   - **返回**：`{ "success": true, "old_key": "old_design", "new_key": "new_design" }`
 
+### `memory_search`
+
+- **用途**：执行基础关键词搜索，返回包含指定关键词的记忆。支持通过 session 进行 namespace 过滤。
+- **参数**：
+
+  ```json
+  {
+    "query": "量子计算",
+    "session": "session_key_here",
+    "limit": 20,
+    "offset": 0,
+    "highlight": true,
+    "output_format": "json"
+  }
+  ```
+
+- **参数说明**：
+  - `query`：搜索关键词，必填
+  - `session`：可选的会话ID，用于namespace过滤。提供有效session时，只返回该session对应namespace下的记忆
+  - `limit`：返回结果数量限制，可选，默认 20，最大 100
+  - `offset`：结果偏移量，用于分页，可选，默认 0
+  - `highlight`：是否在结果中高亮关键词，可选，默认 true
+  - `output_format`：输出格式，可选 `toon` 或 `json`，默认 `toon`
+
+- **行为**：
+  1. 验证搜索功能是否启用（通过 `KVDB_SEARCH_ENABLED` 环境变量控制）
+  2. 如果提供了 `session`，验证 session 有效性并提取对应的 namespace
+  3. 执行 SQLite FTS5 搜索，按相关性排序
+  4. 如果指定了 namespace，只返回 key 以 `{namespace}:` 开头的记忆
+  5. 返回搜索结果和分页信息
+
+- **Session 验证错误**：
+  - 无效的 session 返回 `{"success": false, "message": "invalid session"}`
+
+- **返回示例**（JSON 格式）：
+  ```json
+  {
+    "success": true,
+    "data": {
+      "results": [
+        {
+          "key": "Zeus:global:tech:quantum",
+          "summary": "量子计算技术文档",
+          "excerpt": "...采用<mark>量子</mark>计算方案...",
+          "relevance": 0.85,
+          "score": 0.85
+        }
+      ],
+      "pagination": {
+        "total": 42,
+        "limit": 20,
+        "offset": 0,
+        "hasMore": true
+      }
+    }
+  }
+  ```
+
+### `memory_fulltext_search`
+
+- **用途**：执行全文搜索，支持多关键词组合和逻辑运算符。支持通过 session 进行 namespace 过滤。
+- **参数**：
+
+  ```json
+  {
+    "keywords": "量子,计算,比特",
+    "session": "session_key_here",
+    "operator": "OR",
+    "limit": 20,
+    "offset": 0,
+    "highlight": true,
+    "output_format": "json"
+  }
+  ```
+
+- **参数说明**：
+  - `keywords`：逗号分隔的关键词列表，必填
+  - `session`：可选的会话ID，用于namespace过滤。提供有效session时，只返回该session对应namespace下的记忆
+  - `operator`：逻辑运算符，可选 `AND`（所有关键词必须匹配）或 `OR`（任一关键词匹配），默认 `OR`
+  - `limit`：返回结果数量限制，可选，默认 20，最大 100
+  - `offset`：结果偏移量，用于分页，可选，默认 0
+  - `highlight`：是否在结果中高亮关键词，可选，默认 true
+  - `output_format`：输出格式，可选 `toon` 或 `json`，默认 `toon`
+
+- **行为**：
+  1. 验证搜索功能是否启用
+  2. 如果提供了 `session`，验证 session 有效性并提取对应的 namespace
+  3. 根据运算符组合关键词执行搜索
+  4. 如果指定了 namespace，只返回 key 以 `{namespace}:` 开头的记忆
+  5. 返回搜索结果和分页信息
+
+- **Session 验证错误**：
+  - 无效的 session 返回 `{"success": false, "message": "invalid session"}`
+
+- **返回示例**（JSON 格式）：
+  ```json
+  {
+    "success": true,
+    "data": {
+      "results": [
+        {
+          "key": "Zeus:global:tech:quantum-bits",
+          "summary": "量子比特技术说明",
+          "excerpt": "<mark>量子</mark><mark>比特</mark>是<mark>量子</mark>计算的基本单位...",
+          "relevance": 0.92,
+          "score": 0.92
+        }
+      ],
+      "pagination": {
+        "total": 15,
+        "limit": 20,
+        "offset": 0,
+        "hasMore": false
+      }
+    }
+  }
+  ```
+
+- **搜索功能配置**：
+  搜索功能可以通过以下环境变量配置：
+  - `KVDB_SEARCH_ENABLED`：是否启用搜索功能，默认 `true`
+  - `KVDB_SEARCH_DEFAULT_LIMIT`：默认搜索结果数量，默认 `20`
+  - `KVDB_SEARCH_MAX_LIMIT`：最大搜索结果数量，默认 `100`
+
 ## 可用资源
 
 ### `memory://{key}`
@@ -225,6 +349,9 @@
 | `MCP_HOST` | (未设置) | 绑定的主机地址，留空为自动匹配 |
 | `MCP_ENDPOINT` | `/mcp` | HTTP 流式服务的路径，向下兼容 `fastmcp` 默认 |
 | `MCP_OUTPUT_FORMAT` | `toon` | 默认 `memory_*` 工具的输出格式，可选 `toon` 或 `json`；错误响应始终为 JSON。 |
+| `KVDB_SEARCH_ENABLED` | `true` | 是否启用搜索功能，设置为 `false` 可禁用搜索 |
+| `KVDB_SEARCH_DEFAULT_LIMIT` | `20` | 默认搜索结果数量限制 |
+| `KVDB_SEARCH_MAX_LIMIT` | `100` | 最大搜索结果数量限制 |
 
 其他 `Bun` 环境变量（如 `BUN_DEBUG`）可继续用于 Bun 运行时行为。
 
@@ -276,6 +403,90 @@ links[0]:
 }
 ```
 
+### 搜索工具使用示例
+
+#### 基础关键词搜索
+
+```json
+{
+  "tool": "memory_search",
+  "arguments": {
+    "query": "量子计算",
+    "limit": 10,
+    "offset": 0,
+    "highlight": true,
+    "output_format": "json"
+  }
+}
+```
+
+#### 全文搜索（OR 运算符）
+
+```json
+{
+  "tool": "memory_fulltext_search",
+  "arguments": {
+    "keywords": "量子,计算,比特",
+    "operator": "OR",
+    "limit": 5,
+    "output_format": "json"
+  }
+}
+```
+
+#### 全文搜索（AND 运算符）
+
+```json
+{
+  "tool": "memory_fulltext_search",
+  "arguments": {
+    "keywords": "量子,计算",
+    "operator": "AND",
+    "limit": 10,
+    "offset": 10,
+    "output_format": "json"
+  }
+}
+```
+
+#### 带 Session 的搜索（Namespace 过滤）
+
+```json
+// 先创建 session
+{
+  "tool": "session_new",
+  "arguments": {}
+}
+
+// 使用 session 进行搜索（只返回该 session namespace 下的记忆）
+{
+  "tool": "memory_search",
+  "arguments": {
+    "query": "量子计算",
+    "session": "your_session_key_here",
+    "limit": 10,
+    "output_format": "json"
+  }
+}
+
+// 带 session 的全文搜索
+{
+  "tool": "memory_fulltext_search",
+  "arguments": {
+    "keywords": "量子,计算",
+    "session": "your_session_key_here",
+    "operator": "OR",
+    "limit": 10,
+    "output_format": "json"
+  }
+}
+```
+
+**说明**：
+- 提供有效的 `session` 后，搜索将只返回该 session 对应 namespace 下的记忆（key 以 `{namespace}:` 开头）
+- 无效的 session 会返回错误：`{"success": false, "message": "invalid session"}`
+- 不提供 session 时执行全局搜索（向后兼容）
+
 ### HTTP Streaming 模式
 
 ```bash
@@ -308,3 +519,13 @@ await client.disconnect();
 - **资源 `memory://{key}` 返回 `success: false`**：确认记忆已写入并拼写一致；服务端会将错误文本放在 `message` 字段。
 - **`memory_update` 失败**：常见原因包括提供了无效 `session`、指定 `key` 不存在或传入空的 `value`；检查返回的 `message` 获取详细提示。
 - **`memory_rename` 失败**：`old_key` 必须存在且不同于 `new_key`，`new_key` 不可已存在；命令会在冲突时返回 `success: false` 并说明哪个检查没有通过。
+- **`memory_search` 或 `memory_fulltext_search` 失败**：
+  - 检查 `KVDB_SEARCH_ENABLED` 环境变量是否设置为 `true`
+  - 确认数据库已正确初始化 FTS5 表（运行数据库迁移脚本）
+  - 验证搜索参数格式正确（`query` 或 `keywords` 不能为空）
+  - 检查 `operator` 参数只能是 `AND` 或 `OR`
+  - 确认 `limit` 和 `offset` 是有效数字
+  - **Session 相关错误**：
+    - 如果返回 `invalid session`，检查 session 是否已过期（默认 3 分钟）
+    - 重新调用 `session_new` 获取新 session
+    - 确认 session 字符串拼写正确

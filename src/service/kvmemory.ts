@@ -4,6 +4,7 @@
  * @license MIT
  */
 import { KVMemory } from "../libs/kv";
+import { SearchService, type SearchResult } from "./searchService";
 import {
   type MemoryLinkValue,
   type Memory,
@@ -19,11 +20,18 @@ export type MemoryNoMetaWithLinkSummary = Omit<Memory, "meta"> & {
   links: MemoryLinkWithSummary[];
 };
 
-export class KVMemoryService {
-  private kv: KVMemory;
+export type KVMemoryServiceDependencies = {
+  kv?: KVMemory;
+  searchService?: SearchService;
+};
 
-  constructor() {
-    this.kv = new KVMemory();
+export class KVMemoryService {
+  private readonly kv: KVMemory;
+  readonly searchService: SearchService;
+
+  constructor(dependencies: KVMemoryServiceDependencies = {}) {
+    this.kv = dependencies.kv ?? new KVMemory();
+    this.searchService = dependencies.searchService ?? new SearchService(this.kv);
   }
 
   /**
@@ -126,6 +134,28 @@ export class KVMemoryService {
    */
   async updateKey(oldKey: string, newKey: string) {
     await this.kv.updateKey(oldKey, newKey);
+  }
+
+  /**
+   * 代理基础关键词搜索。
+   * Debug hint: 若返回空结果，先检查 SearchService 内部 `searchEnabled` 配置。
+   */
+  async searchMemory(query: string, limit = 10, offset = 0, namespace?: string): Promise<SearchResult> {
+    return this.searchService.search(query, limit, offset, namespace);
+  }
+
+  /**
+   * 代理多关键词全文搜索。
+   * Debug hint: 查询报错时优先检查 `operator` 与关键词数组是否包含空值。
+   */
+  async fulltextSearchMemory(
+    keywords: string[],
+    operator: "AND" | "OR" = "OR",
+    limit = 10,
+    offset = 0,
+    namespace?: string,
+  ): Promise<SearchResult> {
+    return this.searchService.fulltextSearch(keywords, operator, limit, offset, namespace);
   }
 
   /**

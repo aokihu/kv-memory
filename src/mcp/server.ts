@@ -7,8 +7,10 @@
 import { FastMCP, type Tool, type ToolParameters } from "fastmcp";
 import {
   createMemoryAddTool,
+  createMemoryFulltextSearchTool,
   createMemoryGetTool,
   createMemoryRenameTool,
+  createMemorySearchTool,
   createMemoryUpdateTool,
   createSessionNewTool,
 } from "./tools";
@@ -60,12 +62,19 @@ const memoryRenameTool = createMemoryRenameTool(
   sessionService,
   kvMemoryService,
 );
+const memorySearchTool = createMemorySearchTool(sessionService, kvMemoryService);
+const memoryFulltextSearchTool = createMemoryFulltextSearchTool(
+  sessionService,
+  kvMemoryService,
+);
 
 toolRegistry.set(sessionNewTool.name, sessionNewTool);
 toolRegistry.set(memoryAddTool.name, memoryAddTool);
 toolRegistry.set(memoryGetTool.name, memoryGetTool);
 toolRegistry.set(memoryUpdateTool.name, memoryUpdateTool);
 toolRegistry.set(memoryRenameTool.name, memoryRenameTool);
+toolRegistry.set(memorySearchTool.name, memorySearchTool);
+toolRegistry.set(memoryFulltextSearchTool.name, memoryFulltextSearchTool);
 
 server.addTool({ name: "session_new", ...pickToolDefinition(sessionNewTool) });
 server.addTool({ name: "memory_add", ...pickToolDefinition(memoryAddTool) });
@@ -77,6 +86,14 @@ server.addTool({
 server.addTool({
   name: "memory_rename",
   ...pickToolDefinition(memoryRenameTool),
+});
+server.addTool({
+  name: "memory_search",
+  ...pickToolDefinition(memorySearchTool),
+});
+server.addTool({
+  name: "memory_fulltext_search",
+  ...pickToolDefinition(memoryFulltextSearchTool),
 });
 
 const memoryResourceTemplate = createMemoryResourceTemplate(kvMemoryService);

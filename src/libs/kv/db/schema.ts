@@ -82,6 +82,29 @@ export function initSchema(db: Database) {
   ensureMemoriesFtsObjects(db);
 }
 
+/**
+ * Run FTS5 optimize command for `memories_fts`.
+ *
+ * Debug tip: if this fails, verify SQLite build has FTS5 enabled and table exists.
+ */
+export function optimizeFtsIndex(db: Database): void {
+  db.query("INSERT INTO memories_fts(memories_fts) VALUES('optimize')").run();
+}
+
+/**
+ * Rebuild FTS5 index by dropping and recreating FTS objects.
+ *
+ * Debug tip: if results are still empty after rebuild, inspect `memories` row count
+ * and verify triggers were re-created.
+ */
+export function rebuildFtsIndex(db: Database): void {
+  dropMemoriesFtsObjects(db);
+  ensureMemoriesFtsObjects(db);
+
+  // Backfill existing rows from external-content table.
+  db.query("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')").run();
+}
+
 type SqliteTableColumn = {
   name: string;
 };
@@ -206,11 +229,10 @@ function ensureMemoriesFtsObjects(db: Database): void {
   }
 
   if (shouldRecreateFts) {
-    db.exec("DROP TRIGGER IF EXISTS memories_fts_insert");
-    db.exec("DROP TRIGGER IF EXISTS memories_fts_delete");
-    db.exec("DROP TRIGGER IF EXISTS memories_fts_update");
-    db.exec("DROP TABLE IF EXISTS memories_fts");
+    dropMemoriesFtsObjects(db);
 
+    // FTS5 index uses external-content mode to avoid duplicating memory payload in index storage.
+    // Debug tip: if search returns empty after existing data import, run FTS rebuild for historical rows.
     db.exec(`
       CREATE VIRTUAL TABLE memories_fts USING fts5(
         key,
@@ -244,4 +266,14 @@ function ensureMemoriesFtsObjects(db: Database): void {
       VALUES (new.rowid, new.key, new.summary, new.text);
     END
   `);
+}
+
+/**
+ * Drop all FTS5 objects related to memories search.
+ */
+function dropMemoriesFtsObjects(db: Database): void {
+  db.exec("DROP TRIGGER IF EXISTS memories_fts_insert");
+  db.exec("DROP TRIGGER IF EXISTS memories_fts_delete");
+  db.exec("DROP TRIGGER IF EXISTS memories_fts_update");
+  db.exec("DROP TABLE IF EXISTS memories_fts");
 }

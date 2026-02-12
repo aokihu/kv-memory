@@ -1,0 +1,46 @@
+{
+  "dataset": "edge-cases-search",
+  "description": "Boundary and special-case records for robustness tests.",
+  "records": [
+    {
+      "key": "test:search:edge:001",
+      "summary": "single-char",
+      "text": "a"
+    },
+    {
+      "key": "test:search:edge:002",
+      "summary": "numeric-only",
+      "text": "1234567890 2026 000 42"
+    },
+    {
+      "key": "test:search:edge:003",
+      "summary": "punctuation-heavy",
+      "text": "!!! ??? ... --- ___ ::: ;;; ,,,"
+    },
+    {
+      "key": "test:search:edge:004",
+      "summary": "path-and-url",
+      "text": "path /tmp/search/index.db and url https://example.org/search?q=alpha&op=and"
+    },
+    {
+      "key": "test:search:edge:005",
+      "summary": "quote-and-escape",
+      "text": "quoted 'alpha' and \"beta\" with backslash \\ and regex .*"
+    },
+    {
+      "key": "test:search:edge:006",
+      "summary": "mixed-language-boundary",
+      "text": "中文English混排 keyword边界 测试Case"
+    },
+    {
+      "key": "test:search:edge:007",
+      "summary": "long-unbroken-token",
+      "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "key": "test:search:edge:008",
+      "summary": "long-paragraph",
+      "text": "This boundary record simulates a long paragraph with repeated semantic units. It contains alpha beta gamma and 中文 关键字 to test tokenizer behavior when punctuation, whitespace, and bilingual fragments appear in the same document body for robust fulltext and regular search verification."
+    }
+  ]
+}

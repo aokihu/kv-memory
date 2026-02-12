@@ -1,0 +1,46 @@
+{
+  "dataset": "basic-search",
+  "description": "Baseline keyword search dataset for exact and fuzzy matching validation.",
+  "records": [
+    {
+      "key": "test:search:basic:001",
+      "summary": "Python web service cache",
+      "text": "python flask cache invalidation strategy with redis pubsub"
+    },
+    {
+      "key": "test:search:basic:002",
+      "summary": "Node queue worker",
+      "text": "node worker queue retry policy and dead-letter processing"
+    },
+    {
+      "key": "test:search:basic:003",
+      "summary": "SQLite fulltext intro",
+      "text": "sqlite fts5 full text index setup and migration checklist"
+    },
+    {
+      "key": "test:search:basic:004",
+      "summary": "API authentication",
+      "text": "jwt auth refresh token expiration and revoke flow"
+    },
+    {
+      "key": "test:search:basic:005",
+      "summary": "中文基础检索",
+      "text": "中文 搜索 功能 基础 用例 关键词 匹配"
+    },
+    {
+      "key": "test:search:basic:006",
+      "summary": "Hybrid bilingual note",
+      "text": "search ranking 排序 score tuning with keyword boost"
+    },
+    {
+      "key": "test:search:basic:007",
+      "summary": "Log analysis memory",
+      "text": "error timeout circuit breaker and fallback handler"
+    },
+    {
+      "key": "test:search:basic:008",
+      "summary": "Data pipeline summary",
+      "text": "etl pipeline extract transform load batch quality checks"
+    }
+  ]
+}

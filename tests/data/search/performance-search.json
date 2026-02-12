@@ -1,0 +1,18 @@
+{
+  "dataset": "performance-search",
+  "description": "Deterministic performance dataset generator configuration.",
+  "generator": {
+    "prefix": "test:search:perf",
+    "count": 2000,
+    "summaryTemplate": "Performance record {{index}} {{tokenA}} {{tokenB}}",
+    "textTemplate": "dataset {{index}} keywords {{tokenA}} {{tokenB}} {{tokenC}} group_{{group}} lang_{{lang}} marker_{{marker}}",
+    "tokenPools": {
+      "tokenA": ["alpha", "beta", "gamma", "delta"],
+      "tokenB": ["search", "ranking", "index", "query"],
+      "tokenC": ["sqlite", "fts5", "memory", "engine"],
+      "lang": ["en", "zh", "mix"],
+      "marker": ["hot", "warm", "cold"]
+    },
+    "groupModulo": 50
+  }
+}

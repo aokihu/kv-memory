@@ -2,7 +2,13 @@
  * DB module exports.
  */
 
-export { getDatabase, initDatabase, closeDatabase } from "./schema";
+export {
+  getDatabase,
+  initDatabase,
+  closeDatabase,
+  optimizeFtsIndex,
+  rebuildFtsIndex,
+} from "./schema";
 export { getDatabaseConfig, type DatabaseConfig } from "./config";
 export {
   memoryRowToMemory,

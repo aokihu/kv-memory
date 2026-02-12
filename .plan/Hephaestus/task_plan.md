@@ -1,23 +1,28 @@
-# Task Plan
+# Task Plan: TASK-004-UPDATE-TESTS
 
 ## Goal
-Remove migration tooling and references so the project starts with a fresh SQLite database and no Keyv-to-SQLite migration flow.
+Update test suites for service/API/MCP search paths to verify namespace filtering via session and backward-compatible global search behavior.
+
+## Current Phase
+Step 5 (complete)
 
 ## Steps
-1. [x] Analyze whether `src/libs/kv/db/migration-utils.ts` is used by non-migration code.
-2. [x] Remove migration implementation files and db export (`migrate.ts`, `migration-utils.ts` if safe, `index.ts` export).
-3. [x] Update migration-related tests (`tests/db.migrate.test.ts`, `tests/final-verification.test.ts`).
-4. [x] Update migration-related docs (`README.md`, `docs/DEPLOYMENT_GUIDE.md`, `docs/KEYV_TO_SQLITE_MIGRATION.md`).
-5. [x] Run build/test verification for changed scope and capture outcomes.
-6. [x] Final review and delivery summary.
+1. Inspect target tests and shared test utilities to identify existing fixture/session setup and assertion patterns.
+2. Update `tests/search.service.test.ts` to validate namespace-filtered search behavior and no-namespace global compatibility.
+3. Update `tests/search.api.integration.test.ts` to validate `session` query behavior for valid session filtering, invalid session error, and no-session fallback.
+4. Update `tests/mcp.search-tools.test.ts` to validate `session` tool input behavior for namespace filtering, invalid session error, and no-session fallback.
+5. Run relevant test files and record pass/fail results.
 
-## Execution Rules
-- Execute steps strictly in sequence.
-- Modify only files listed in task scope and direct compile-impact references.
-- Record all findings/errors in planning files immediately.
+## Status
+- [complete] Step 1
+- [complete] Step 2
+- [complete] Step 3
+- [complete] Step 4
+- [complete] Step 5
 
 ## Errors Encountered
-| Step | Error | Resolution |
-|---|---|---|
-| Init | `session-catchup.py` path unavailable in current skill installation | Proceeded with existing `.plan/Hephaestus/` files and logged manual catchup |
-| 5 | `bunx tsc --noEmit` failed with controller signature mismatch errors | Confirmed as pre-existing and unrelated to migration removal; migration-related tests pass |
+| Error | Attempt | Resolution |
+|-------|---------|------------|
+| `session-catchup.py` path `${CLAUDE_PLUGIN_ROOT}` missing | 1 | Switched to explicit script path under skill directory |
+| `session-catchup.py` file absent in skill directory | 2 | Continued with manual planning files under `.plan/Hephaestus` |
+| Combined `bun test` run across mocked + integration suites causes `optimizeFtsIndex` export error | 1 | Verified target suites pass when executed independently; treated as cross-suite module-mock interference |

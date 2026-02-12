@@ -36,8 +36,34 @@ This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) 
 - `POST /get_memory` - 获取记忆
 - `POST /update_memory` - 更新记忆内容
 - `POST /update_memory_key` - 更新记忆键名
+- `GET /search` - 关键词搜索记忆
+- `GET /fulltext` - 全文搜索记忆
 
 详细 API 文档请参考 [API.md](API.md)。
+
+## 搜索功能
+
+项目提供了基于 SQLite FTS5 的全文搜索功能，支持：
+
+### 搜索特性
+- **关键词搜索**：支持中英文关键词搜索
+- **全文搜索**：支持多关键词组合和逻辑运算符（AND/OR）
+- **相关性排序**：搜索结果按相关性自动排序
+- **分页支持**：支持 limit/offset 参数进行分页
+- **关键词高亮**：搜索结果中自动高亮匹配的关键词
+
+### 配置选项
+搜索功能可以通过环境变量配置：
+- `KVDB_SEARCH_ENABLED`：是否启用搜索功能（默认：true）
+- `KVDB_SEARCH_DEFAULT_LIMIT`：默认搜索结果数量（默认：20）
+- `KVDB_SEARCH_MAX_LIMIT`：最大搜索结果数量（默认：100）
+
+### MCP 搜索工具
+项目还提供了 MCP 搜索工具：
+- `memory_search`：基础关键词搜索工具
+- `memory_fulltext_search`：全文搜索工具
+
+详细 MCP 工具文档请参考 [MCP-README.md](MCP-README.md)。
 
 ## Benchmark
 

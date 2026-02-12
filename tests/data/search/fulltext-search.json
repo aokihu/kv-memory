@@ -1,0 +1,46 @@
+{
+  "dataset": "fulltext-search",
+  "description": "Multi-keyword records for AND/OR operator and excerpt highlighting tests.",
+  "records": [
+    {
+      "key": "test:search:fulltext:001",
+      "summary": "Distributed tracing design",
+      "text": "trace span context propagation latency budget and error budget"
+    },
+    {
+      "key": "test:search:fulltext:002",
+      "summary": "Observability dashboard",
+      "text": "metrics logs traces unified dashboard and oncall alert routing"
+    },
+    {
+      "key": "test:search:fulltext:003",
+      "summary": "量子算法文档",
+      "text": "量子 算法 量子 比特 门操作 误差 校正 与 全文 搜索"
+    },
+    {
+      "key": "test:search:fulltext:004",
+      "summary": "Bilingual machine learning note",
+      "text": "machine learning 模型 训练 推理 pipeline feature store drift monitor"
+    },
+    {
+      "key": "test:search:fulltext:005",
+      "summary": "Security incident report",
+      "text": "credential leak detection response containment and root cause analysis"
+    },
+    {
+      "key": "test:search:fulltext:006",
+      "summary": "Search relevance notes",
+      "text": "keyword match phrase match proximity rank and snippet generation"
+    },
+    {
+      "key": "test:search:fulltext:007",
+      "summary": "Natural language processing",
+      "text": "tokenization stemming lemmatization bilingual corpus and query expansion"
+    },
+    {
+      "key": "test:search:fulltext:008",
+      "summary": "数据库事务一致性",
+      "text": "事务 一致性 隔离级别 锁竞争 回滚 恢复 全文 检索"
+    }
+  ]
+}

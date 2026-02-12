@@ -1,12 +1,58 @@
-# Progress
+# Progress Log
 
 ## 2026-02-12
-- Initialized planning for migration-tool removal task.
-- Loaded `planning-with-files` skill and prepared stepwise execution order.
-- Attempted session catchup script; path missing in installed skill package.
-- Reused `.plan/Hephaestus/` files and reset them to the current task scope.
-- Completed Step 1: analyzed `migration-utils.ts` references; only migration flow uses it.
-- Completed Step 2: removed `migrate.ts`, removed `migration-utils.ts`, and cleaned migration exports from `src/libs/kv/db/index.ts`.
-- Completed Step 3: updated migration-related tests and docs to remove migration-tool references.
-- Completed Step 4: ran verification (`bunx tsc --noEmit`, targeted bun tests, short app startup smoke run).
-- Recorded existing unrelated TypeScript controller errors from `bunx tsc --noEmit`.
+- Started new task: `TASK-004-UPDATE-TESTS`.
+- Loaded `planning-with-files` skill as mandatory pre-execution step.
+- Attempted session catchup with explicit skill script path; script file not present in environment.
+- Reinitialized planning entries for this task in `.plan/Hephaestus/`.
+- Completed Step 1: inspected target test files and implementation behavior for service/API/MCP session namespace filtering.
+- Completed Step 2: updated `tests/search.service.test.ts` with namespace SQL-filter assertions and no-namespace backward compatibility assertions.
+- Completed Step 3: updated `tests/search.api.integration.test.ts` with session-aware `/search` integration coverage (valid namespace filter, invalid session 401, no-session global fallback).
+- Completed Step 4: updated `tests/mcp.search-tools.test.ts` with `memory_search` session coverage (valid namespace filter, invalid session payload, no-session global fallback).
+- Completed Step 5: ran verification tests.
+- Verification results:
+  - `bun test tests/search.service.test.ts` -> pass.
+  - `bun test tests/search.api.integration.test.ts` -> pass.
+  - `bun test tests/mcp.search-tools.test.ts` -> pass.
+  - Combined run of all three files in one process still hits cross-suite module mocking/export issue (`optimizeFtsIndex`).
+- Started new task: `TASK-003-MCP-TOOLS-SESSION`.
+- Loaded `planning-with-files` skill as mandatory pre-execution step.
+- Attempted session catchup with explicit skill script path; script file not present in environment.
+- Reinitialized plan for this task under `.plan/Hephaestus/`.
+- Completed Step 1: inspected target MCP tool files, session-enabled reference tool, and MCP server wiring.
+- Completed Step 2: implemented optional `session` schema + validation + namespace forwarding in `src/mcp/tools/memorySearch.ts`.
+- Completed Step 3: implemented optional `session` schema + validation + namespace forwarding in `src/mcp/tools/memoryFulltextSearch.ts`.
+- Completed Step 4: updated MCP server tool factory calls to inject `SessionService` for both search tools.
+- Completed Step 5: ran compile checks and recorded pre-existing baseline/type-check mode issues.
+- Started new task: `TASK-001-SEARCH-NAMESPACE-FILTER`.
+- Loaded `planning-with-files` skill and attempted session catchup.
+- Catchup script unavailable in current environment; proceeded with manual planning files.
+- Initialized stepwise plan for namespace search filter implementation.
+- Completed Step 1: inspected `searchService`/`kvmemory` signatures and confirmed SQL filter insertion point in `executeSearch`.
+- Completed Step 2: added optional namespace support and conditional `key LIKE` filtering in `SearchService` row/count queries.
+- Completed Step 3: updated `KVMemoryService` proxy methods to accept and pass through optional namespace.
+- Completed Step 4: verified `src/type.ts` has no impacted search signature type declarations; no update needed.
+- Completed Step 5: ran `bun test tests/search.service.test.ts` (pass) and `bunx tsc --noEmit` (fails on pre-existing controller typing issues outside task scope).
+- Started new task: create reusable search test datasets + import/cleanup tooling.
+- Loaded `planning-with-files` skill as mandatory pre-execution step.
+- Attempted session catchup with `${CLAUDE_PLUGIN_ROOT}` script path; failed (path missing).
+- Attempted explicit catchup script path under skill directory; failed (script file absent).
+- Reinitialized planning files for the new task under `.plan/Hephaestus/`.
+- Completed Step 1: inspected current `tests/` search test patterns and identified compatible dataset/script structure.
+- Completed Step 2: created `tests/data/search/diverse-memories.json` with mixed language, length variance, and special characters.
+- Completed Step 3: created scenario datasets for basic/fulltext/performance/edge search cases.
+- Completed Step 4: added `tests/tools/import-search-datasets.ts` with deterministic generator and dataset selection flags.
+- Completed Step 5: added `tests/tools/cleanup-search-datasets.ts` for prefix-based cleanup.
+- Completed Step 6: verified selected and all-dataset import flows, then cleanup flow.
+- Started new task: `TASK-002-HTTP-API-SESSION`.
+- Loaded `planning-with-files` skill as mandatory pre-execution step.
+- Attempted session catchup with `${CLAUDE_PLUGIN_ROOT}` script path; failed (path missing).
+- Attempted explicit catchup script path under skill directory; failed (script file absent).
+- Reinitialized planning entries for `TASK-002-HTTP-API-SESSION` in `.plan/Hephaestus/`.
+- Completed Step 1: inspected `searchController` schemas/input parsing and route wiring in `src/index.ts`.
+- Completed Step 2: added optional `session` fields in search/fulltext query schemas and query input parsing.
+- Completed Step 3: added session validation logic and invalid session 401 response in both endpoints.
+- Completed Step 4: extracted `kv_namespace` from valid session and passed namespace to search service calls while preserving no-session global search.
+- Completed Step 5: updated `SearchController` instantiation wiring and ran verification commands.
+- Verification: `bunx tsc --noEmit` still fails due to pre-existing type errors in unrelated controllers; `bun test tests/search.service.test.ts` passes.
+- Additional check: `bunx tsc --noEmit src/controller/searchController.ts` shows TS1259 from zod locale declaration imports (tooling mode specific), not from controller logic changes.

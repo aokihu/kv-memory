@@ -16,11 +16,14 @@ import {
 } from "../../type";
 import {
   getDatabase,
+  getDatabaseConfig,
   initDatabase,
   linksToRelationRows,
   memoryRowToMemory,
   memoryToWritableColumns,
   relationRowToMemoryLink,
+  optimizeFtsIndex as optimizeFtsIndexInDb,
+  rebuildFtsIndex as rebuildFtsIndexInDb,
   mergeMemoryPatch,
   runInTransaction,
   withRenamedMetaId,
@@ -30,9 +33,11 @@ import {
 
 export class KVMemory {
   private _database: Database;
+  private _searchEnabled: boolean;
 
   constructor() {
     this._database = initDatabase(getDatabase());
+    this._searchEnabled = getDatabaseConfig().searchEnabled;
 
     // Mixed access with other SQLite clients (e.g. legacy Keyv session storage)
     // may hit transient write locks; WAL + busy timeout improves interoperability.
@@ -208,6 +213,46 @@ export class KVMemory {
 
       this._database.query(`DELETE FROM memories WHERE key = ?`).run(oldKey);
     });
+  }
+
+  /**
+   * Optimize FTS5 index pages to improve search performance.
+   *
+   * Debug hint: if optimize fails repeatedly, inspect DB logs and FTS table existence.
+   */
+  async optimizeFtsIndex(): Promise<void> {
+    if (!this._searchEnabled) {
+      console.warn("KVMemory: optimizeFtsIndex skipped because search is disabled");
+      return;
+    }
+
+    try {
+      optimizeFtsIndexInDb(this._database);
+      console.info("KVMemory: optimizeFtsIndex completed");
+    } catch (error) {
+      console.error("KVMemory: optimizeFtsIndex failed", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Rebuild FTS5 index objects and re-sync index content.
+   *
+   * Debug hint: if post-rebuild search is empty, verify trigger recreation and `memories` rows.
+   */
+  async rebuildFtsIndex(): Promise<void> {
+    if (!this._searchEnabled) {
+      console.warn("KVMemory: rebuildFtsIndex skipped because search is disabled");
+      return;
+    }
+
+    try {
+      rebuildFtsIndexInDb(this._database);
+      console.info("KVMemory: rebuildFtsIndex completed");
+    } catch (error) {
+      console.error("KVMemory: rebuildFtsIndex failed", error);
+      throw error;
+    }
   }
 
   /**

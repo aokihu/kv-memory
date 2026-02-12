@@ -26,7 +26,7 @@ import {
   withRenamedMetaId,
   type MemoryLinkRelationReadRow,
   type MemoryRow,
-} from "../db";
+} from "./db";
 
 export class KVMemory {
   private _database: Database;

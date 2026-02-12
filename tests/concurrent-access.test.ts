@@ -5,7 +5,7 @@
  */
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { initDatabase, getDatabase } from "../src/libs/db";
+import { initDatabase, getDatabase } from "../src/libs/kv/db";
 import { KVMemory } from "../src/libs/kv";
 
 const db = initDatabase(getDatabase());

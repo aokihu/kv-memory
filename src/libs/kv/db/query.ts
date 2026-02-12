@@ -5,8 +5,8 @@
  * Debug entry point: inspect `memoryRowToMemory()` when read result looks malformed.
  */
 
-import type { Memory, MemoryLinkValue, MemoryMeta } from "../../type";
-import { MemoryLink, MemoryMetaSchema, MemorySchema } from "../../type";
+import type { Memory, MemoryLinkValue, MemoryMeta } from "../../../type";
+import { MemoryLink, MemoryMetaSchema, MemorySchema } from "../../../type";
 
 /**
  * Raw row shape returned from `memories` table reads.

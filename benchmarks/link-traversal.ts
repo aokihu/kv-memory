@@ -6,7 +6,7 @@
  */
 
 import { Database } from "bun:sqlite";
-import { initDatabase, getDatabase } from "../src/libs/db";
+import { initDatabase, getDatabase } from "../src/libs/kv/db";
 import { KVMemory } from "../src/libs/kv";
 import type { Memory } from "../src/type";
 

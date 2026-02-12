@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { getDatabase, initDatabase } from "../src/libs/db";
+import { getDatabase, initDatabase } from "../src/libs/kv/db";
 import { KVMemory } from "../src/libs/kv";
 import type { MemoryMeta } from "../src/type";
 

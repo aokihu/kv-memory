@@ -2,7 +2,7 @@
 
 本项目是使用**sqlite**来实现**Key-Value**模式的，帮助Agent实现记忆的MCP工具.
 用于存储短期、高频、结构化记忆，支持快速读写与动态演化。
-用于存储长期稳定文档（规范、说明、设计文档等），不参与动态记忆代谢。
+
 系统目标不是“记住一切”，而是通过 **结构、行为和时间信号**，使记忆能够自然演化、沉底、合并或淘汰。
 
 ---
@@ -66,7 +66,7 @@ Agent 可以通过 link 进行 **链式回溯与上下文扩展**，
 
 ### Agent 可以
 
-- 读取 Key–Value 记忆与 Database 文档  
+- 读取 Key–Value 记忆  
 - 基于现有记忆进行推理、生成代码或提出决策建议  
 - 建议创建新的记忆节点  
 - 建议潜在的记忆关联（link suggestion）  
@@ -89,13 +89,7 @@ Agent 可以通过 link 进行 **链式回溯与上下文扩展**，
   记忆模型与 Schema 定义（Zod）
 
 - `src/libs/kv/kv.ts`  
-  Key–Value 记忆核心逻辑（读写、访问、演化）
-
-- `src/libs/db/schema.ts`  
-  Database 层 schema 与初始化
-
-- `src/libs/db/config.ts`  
-  Database 配置项（数据库路径与 pragma）
+  Key–Value 记忆核心逻辑（基于SQLite的读写、访问、演化）
 
 - `src/index.ts`  
   应用入口或统一导出

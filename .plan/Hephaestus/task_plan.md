@@ -1,23 +1,23 @@
 # Task Plan
 
 ## Goal
-对已修复的 `src/index.ts` 执行技术验证：编译检查、端口冲突检查、服务配置语法确认与可启动性测试。
+Remove migration tooling and references so the project starts with a fresh SQLite database and no Keyv-to-SQLite migration flow.
 
 ## Steps
-1. 运行 TypeScript 编译检查（`bunx tsc --noEmit`）并记录结果。
-2. 检查本机 `3030` 端口监听占用情况，验证是否存在冲突。
-3. 基于 `src/index.ts` 与运行时命令验证 HTTP 服务配置语法与可启动性。
+1. [x] Analyze whether `src/libs/kv/db/migration-utils.ts` is used by non-migration code.
+2. [x] Remove migration implementation files and db export (`migrate.ts`, `migration-utils.ts` if safe, `index.ts` export).
+3. [x] Update migration-related tests (`tests/db.migrate.test.ts`, `tests/final-verification.test.ts`).
+4. [x] Update migration-related docs (`README.md`, `docs/DEPLOYMENT_GUIDE.md`, `docs/KEYV_TO_SQLITE_MIGRATION.md`).
+5. [x] Run build/test verification for changed scope and capture outcomes.
+6. [x] Final review and delivery summary.
 
-## Status
-- [completed] Step 1
-- [completed] Step 2
-- [completed] Step 3
+## Execution Rules
+- Execute steps strictly in sequence.
+- Modify only files listed in task scope and direct compile-impact references.
+- Record all findings/errors in planning files immediately.
 
 ## Errors Encountered
-| Error | Attempt | Resolution |
-|---|---:|---|
-| session-catchup.py not found at expected path | 1 | Continue with manual planning files in `.plan/Hephaestus/` |
-| `bun test` failed with `EADDRINUSE` on port 8787 | 1 | Ran targeted test files that cover modified paths; all passed |
-| migration compatibility tests mismatch after schema decoupling | 1 | User confirmed old DB compatibility can be dropped; keep focus on current runtime path |
-| planning skill catchup script not present in current installation path | 1 | Continue with manual planning updates in `.plan/Hephaestus/` |
-| `bunx tsc --noEmit` has existing TS2554 errors in controller files | 1 | Marked as pre-existing/unrelated to `src/index.ts` port fix; proceeded with runtime-level validation |
+| Step | Error | Resolution |
+|---|---|---|
+| Init | `session-catchup.py` path unavailable in current skill installation | Proceeded with existing `.plan/Hephaestus/` files and logged manual catchup |
+| 5 | `bunx tsc --noEmit` failed with controller signature mismatch errors | Confirmed as pre-existing and unrelated to migration removal; migration-related tests pass |

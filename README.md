@@ -19,9 +19,7 @@ This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) 
 - 记忆存储使用 `bun:sqlite`（原生 SQLite）
 - 记忆主表：`memories`
 - 链接关系表：`memory_links`
-- 迁移工具：`bun run src/libs/db/migrate.ts --source <legacy-keyv-db>`
-
-迁移说明见 `docs/KEYV_TO_SQLITE_MIGRATION.md`。
+- 当前项目以全新 SQLite 数据库启动，不包含 Keyv 迁移工具。
 
 ## MCP 服务端
 

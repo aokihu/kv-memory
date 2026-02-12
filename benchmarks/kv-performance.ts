@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Database } from "bun:sqlite";
 import { KVMemory } from "../src/libs/kv";
-import { getDatabase, initDatabase } from "../src/libs/db";
+import { getDatabase, initDatabase } from "../src/libs/kv/db";
 import { MemoryStatusEnums, type Memory, type MemoryNoMeta } from "../src/type";
 
 const OPERATIONS = 400;

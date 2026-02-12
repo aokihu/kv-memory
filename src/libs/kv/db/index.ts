@@ -17,15 +17,3 @@ export {
 } from "./query";
 export { runInTransaction } from "./transaction";
 export { backupDatabaseFile, type BackupResult } from "./backup";
-export {
-  parseNamespacedKey,
-  parseKeyvRowToMemoryRecord,
-  readKeyvRows,
-  convertKeyvRows,
-  buildWritableMigrationData,
-  validateMigratedRecords,
-  type KeyvRow,
-  type MigratedMemoryRecord,
-  type MigrationWarning,
-} from "./migration-utils";
-export { migrateKeyvToSQLite, type MigrationOptions, type MigrationReport } from "./migrate";

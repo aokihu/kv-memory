@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { closeDatabase, getDatabase, initDatabase } from "../src/libs/db";
+import { closeDatabase, getDatabase, initDatabase } from "../src/libs/kv/db";
 
 function makeTempDatabasePath(): { dir: string; file: string } {
   const dir = mkdtempSync(join(tmpdir(), "kvdb-mem-schema-"));

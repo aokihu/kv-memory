@@ -18,7 +18,7 @@ const MemoryFulltextSearchSchema = z.object({
     .min(1)
     .describe("Comma-separated keywords, e.g. memory,search,sqlite"),
   operator: z.enum(["AND", "OR"]).optional().default("OR").describe("Keyword operator"),
-  session: z.string().optional().describe("Optional session ID for namespace filtering"),
+  session: z.string().min(1).describe("Required session ID for namespace filtering"),
   limit: z.number().int().min(1).max(100).optional().default(10).describe("Page size (1-100)"),
   offset: z.number().int().min(0).optional().default(0).describe("Pagination offset"),
   output_format: z.enum(["json", "toon"]).optional().default("toon"),
@@ -35,14 +35,11 @@ export const createMemoryFulltextSearchTool = (
   parameters: MemoryFulltextSearchSchema,
   execute: async (args: MemoryFulltextSearchInput) => {
     try {
-      let namespace: string | undefined;
-      if (args.session) {
-        const sessionData = await sessionService.getSession(args.session);
-        if (!sessionData) {
-          return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
-        }
-        namespace = sessionData.kv_namespace;
+      const sessionData = await sessionService.getSession(args.session);
+      if (!sessionData) {
+        return JSON.stringify({ success: false, message: "invalid session" }, null, 2);
       }
+      const namespace = sessionData.kv_namespace;
 
       const keywordList = args.keywords
         .split(",")

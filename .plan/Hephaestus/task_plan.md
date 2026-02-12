@@ -1,28 +1,31 @@
-# Task Plan: TASK-004-UPDATE-TESTS
+# TASK-007-UPDATE-MCP-TESTS 任务计划
 
-## Goal
-Update test suites for service/API/MCP search paths to verify namespace filtering via session and backward-compatible global search behavior.
+## 目标
+更新 `tests/mcp.search-tools.test.ts`，使所有相关测试符合 `session` 为必填参数的新约束。
 
-## Current Phase
-Step 5 (complete)
+## 执行步骤（严格顺序）
+1. **审阅现有测试**
+   - 读取目标文件并定位所有 `memory_search` 与 `memory_fulltext_search` 用例。
+   - 识别无 `session` 参数和旧描述文本。
+2. **修改测试用例**
+   - 移除或改造无 `session` 参数的测试。
+   - 确保每个有效路径测试都传入由 `session_new` 创建的有效 `session`。
+   - 更新用例描述为“session 必填”语义。
+3. **补充无效 session 错误测试**
+   - 添加/更新用例验证无效 `session` 返回错误。
+4. **执行测试验证**
+   - 运行 `tests/mcp.search-tools.test.ts` 对应测试命令并确认通过。
+5. **收尾记录**
+   - 记录修改内容与测试结果。
 
-## Steps
-1. Inspect target tests and shared test utilities to identify existing fixture/session setup and assertion patterns.
-2. Update `tests/search.service.test.ts` to validate namespace-filtered search behavior and no-namespace global compatibility.
-3. Update `tests/search.api.integration.test.ts` to validate `session` query behavior for valid session filtering, invalid session error, and no-session fallback.
-4. Update `tests/mcp.search-tools.test.ts` to validate `session` tool input behavior for namespace filtering, invalid session error, and no-session fallback.
-5. Run relevant test files and record pass/fail results.
+## 状态
+- [complete] 步骤1 审阅现有测试
+- [complete] 步骤2 修改测试用例
+- [complete] 步骤3 补充无效 session 错误测试
+- [complete] 步骤4 执行测试验证
+- [complete] 步骤5 收尾记录
 
-## Status
-- [complete] Step 1
-- [complete] Step 2
-- [complete] Step 3
-- [complete] Step 4
-- [complete] Step 5
-
-## Errors Encountered
-| Error | Attempt | Resolution |
-|-------|---------|------------|
-| `session-catchup.py` path `${CLAUDE_PLUGIN_ROOT}` missing | 1 | Switched to explicit script path under skill directory |
-| `session-catchup.py` file absent in skill directory | 2 | Continued with manual planning files under `.plan/Hephaestus` |
-| Combined `bun test` run across mocked + integration suites causes `optimizeFtsIndex` export error | 1 | Verified target suites pass when executed independently; treated as cross-suite module-mock interference |
+## 错误记录
+| 错误 | 尝试 | 处理 |
+|---|---:|---|
+| session-catchup.py 路径不存在 | 1 | 改为手动初始化规划文件并继续 |

@@ -127,7 +127,9 @@ describe("MCP search tools", () => {
   test("calls memory_search and returns MCP text content with success payload", async () => {
     const kvMemoryService = new KVMemoryService();
     const uniqueToken = `${testKeyPrefix}${Date.now()}_query_token`;
-    const key = `${testKeyPrefix}${Date.now()}_search_key`;
+    const namespace = `${testKeyPrefix}${Date.now()}_search_ns`;
+    const session = await createServerSession(namespace);
+    const key = `${namespace}:${testKeyPrefix}${Date.now()}_search_key`;
 
     await kvMemoryService.addMemory(key, {
       summary: "mcp search summary",
@@ -136,6 +138,7 @@ describe("MCP search tools", () => {
 
     const result = await callRegisteredTool("memory_search", {
       query: uniqueToken,
+      session,
       limit: 10,
       offset: 0,
       output_format: "json",
@@ -170,7 +173,9 @@ describe("MCP search tools", () => {
     const kvMemoryService = new KVMemoryService();
     const keywordA = `${testKeyPrefix}${Date.now()}_kw_a`;
     const keywordB = `${testKeyPrefix}${Date.now()}_kw_b`;
-    const key = `${testKeyPrefix}${Date.now()}_fulltext_key`;
+    const namespace = `${testKeyPrefix}${Date.now()}_fulltext_ns`;
+    const session = await createServerSession(namespace);
+    const key = `${namespace}:${testKeyPrefix}${Date.now()}_fulltext_key`;
 
     await kvMemoryService.addMemory(key, {
       summary: "mcp fulltext summary",
@@ -179,6 +184,7 @@ describe("MCP search tools", () => {
 
     const result = await callRegisteredTool("memory_fulltext_search", {
       keywords: `${keywordA},${keywordB}`,
+      session,
       operator: "AND",
       limit: 10,
       offset: 0,
@@ -250,32 +256,26 @@ describe("MCP search tools", () => {
     expect(payload.message).toBe("invalid session");
   });
 
-  test("memory_search without session keeps global search behavior", async () => {
-    const kvMemoryService = new KVMemoryService();
-    const namespaceA = `${testKeyPrefix}${Date.now()}_global_ns_a`;
-    const namespaceB = `${testKeyPrefix}${Date.now()}_global_ns_b`;
-    const token = `${testKeyPrefix}${Date.now()}_global_token`;
-    const { keyA, keyB } = await seedNamespaceRecords(kvMemoryService, namespaceA, namespaceB, token);
-
-    const result = await callRegisteredTool("memory_search", {
-      query: token,
+  test("memory_fulltext_search with invalid session returns invalid session payload", async () => {
+    const result = await callRegisteredTool("memory_fulltext_search", {
+      keywords: "test",
+      operator: "OR",
+      session: "invalid_session_id",
       output_format: "json",
     });
 
+    expect(result.isError).toBeUndefined();
     const payload = parseJsonPayload(result);
-    expect(payload.success).toBe(true);
-
-    const data = payload.data as {
-      results: Array<{ key: string }>;
-    };
-    const keys = data.results.map((item) => item.key);
-    expect(keys.includes(keyA)).toBe(true);
-    expect(keys.includes(keyB)).toBe(true);
+    expect(payload.success).toBe(false);
+    expect(payload.message).toBe("invalid session");
   });
 
-  test("returns validation error for invalid memory_search arguments", async () => {
+  test("returns validation error for invalid memory_search arguments when session is required", async () => {
+    const session = await createServerSession(`${testKeyPrefix}${Date.now()}_validation_search_ns`);
+
     const invalidQueryResult = await callRegisteredTool("memory_search", {
       query: "   ",
+      session,
       output_format: "json",
     });
 
@@ -285,6 +285,7 @@ describe("MCP search tools", () => {
 
     const invalidPaginationResult = await callRegisteredTool("memory_search", {
       query: "valid",
+      session,
       limit: 101,
       output_format: "json",
     });
@@ -294,10 +295,13 @@ describe("MCP search tools", () => {
     expect(invalidPaginationResult.content[0]?.text.length).toBeGreaterThan(0);
   });
 
-  test("returns validation and execution errors for memory_fulltext_search", async () => {
+  test("returns validation and execution errors for memory_fulltext_search when session is required", async () => {
+    const session = await createServerSession(`${testKeyPrefix}${Date.now()}_validation_fulltext_ns`);
+
     const invalidOperatorResult = await callRegisteredTool("memory_fulltext_search", {
       keywords: "a,b",
       operator: "XOR",
+      session,
       output_format: "json",
     });
 
@@ -307,6 +311,7 @@ describe("MCP search tools", () => {
 
     const invalidKeywordResult = await callRegisteredTool("memory_fulltext_search", {
       keywords: "   ",
+      session,
       output_format: "json",
     });
 
@@ -316,6 +321,7 @@ describe("MCP search tools", () => {
 
     const emptyKeywordExecutionResult = await callRegisteredTool("memory_fulltext_search", {
       keywords: ",,,",
+      session,
       output_format: "json",
     });
 
@@ -325,10 +331,12 @@ describe("MCP search tools", () => {
     expect(payload.message).toBe("keywords must contain at least one non-empty value");
   });
 
-  test("supports toon output for memory_search and memory_fulltext_search", async () => {
+  test("supports toon output for memory_search and memory_fulltext_search with required session", async () => {
     const kvMemoryService = new KVMemoryService();
     const token = `${testKeyPrefix}${Date.now()}_toon_token`;
-    const key = `${testKeyPrefix}${Date.now()}_toon_key`;
+    const namespace = `${testKeyPrefix}${Date.now()}_toon_ns`;
+    const session = await createServerSession(namespace);
+    const key = `${namespace}:${testKeyPrefix}${Date.now()}_toon_key`;
 
     await kvMemoryService.addMemory(key, {
       summary: "toon summary",
@@ -337,6 +345,7 @@ describe("MCP search tools", () => {
 
     const searchToon = await callRegisteredTool("memory_search", {
       query: token,
+      session,
       output_format: "toon",
     });
     expect(searchToon.isError).toBeUndefined();
@@ -347,6 +356,7 @@ describe("MCP search tools", () => {
     const fulltextToon = await callRegisteredTool("memory_fulltext_search", {
       keywords: token,
       operator: "OR",
+      session,
       output_format: "toon",
     });
     expect(fulltextToon.isError).toBeUndefined();

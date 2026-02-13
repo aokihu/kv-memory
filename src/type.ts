@@ -38,6 +38,8 @@ export const MemoryMetaSchema = z.object({
   out_degree: z.number(), // 出度
   access_count: z.number(), // 访问次数
   traverse_count: z.number(), // 遍历次数
+  version: z.number().int().nonnegative().optional(), // 乐观锁版本号（兼容旧数据）
+  score: z.number().min(0).max(100).default(50).optional(), // 记忆分数
   status: MemoryStatusEnums, // 状态
 });
 
@@ -54,7 +56,9 @@ export const MemoryWithLinksSchema = MemorySchema.extend({
   links: z.array(MemoryLink).default([]),
 });
 
-export type MemoryMeta = z.infer<typeof MemoryMetaSchema>;
+export type MemoryMeta = z.infer<typeof MemoryMetaSchema> & {
+  score?: number;
+};
 export type Memory = z.infer<typeof MemorySchema>;
 export type MemoryNoMeta = z.infer<typeof MemoryNoMetaSchema>;
 export type MemoryWithLinks = z.infer<typeof MemoryWithLinksSchema>;

@@ -7,9 +7,16 @@
 import type { Database } from "bun:sqlite";
 import { getDatabase, getDatabaseConfig, initDatabase } from "../libs/kv/db";
 import { KVMemory } from "../libs/kv";
+import {
+  appendMemoryStateFilter,
+  type MemoryStateFilter,
+  type QueryMemoryState,
+} from "../libs/kv/db/query";
 import type { Memory } from "../type";
 
 type SearchOperator = "AND" | "OR";
+
+export type SearchStateFilterInput = QueryMemoryState | QueryMemoryState[] | MemoryStateFilter;
 
 type SearchRow = {
   key: string;
@@ -59,7 +66,13 @@ export class SearchService {
    * Debug hint: 如果结果为空，先检查 `query` 是否被 normalize 为空，
    * 再检查 `KVDB_SEARCH_ENABLED` 与 FTS 对象是否存在。
    */
-  async search(query: string, limit = 10, offset = 0, namespace?: string): Promise<SearchResult> {
+  async search(
+    query: string,
+    limit = 10,
+    offset = 0,
+    namespace?: string,
+    statusFilter?: SearchStateFilterInput,
+  ): Promise<SearchResult> {
     this.validateSearchQuery(query);
     const paging = this.normalizePagination(limit, offset);
 
@@ -68,7 +81,7 @@ export class SearchService {
     }
 
     const matchQuery = this.buildSearchQueryFromText(query);
-    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace);
+    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace, statusFilter);
   }
 
   /**
@@ -82,6 +95,7 @@ export class SearchService {
     limit = 10,
     offset = 0,
     namespace?: string,
+    statusFilter?: SearchStateFilterInput,
   ): Promise<SearchResult> {
     this.validateKeywords(keywords);
     this.validateOperator(operator);
@@ -92,7 +106,7 @@ export class SearchService {
     }
 
     const matchQuery = this.buildSearchQueryFromKeywords(keywords, operator);
-    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace);
+    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace, statusFilter);
   }
 
   /**
@@ -103,50 +117,37 @@ export class SearchService {
     limit: number,
     offset: number,
     namespace?: string,
+    statusFilter?: SearchStateFilterInput,
   ): Promise<SearchResult> {
     try {
       const namespacePrefix = namespace?.trim() ? `${namespace.trim()}:` : null;
-      const rows = namespacePrefix
-        ? (this.database
-            .query(
-              `SELECT key, summary, text,
-                      bm25(memories_fts) AS rank,
-                      snippet(memories_fts, 2, '<mark>', '</mark>', '...', 18) AS excerpt
-                 FROM memories_fts
-                WHERE memories_fts MATCH ?
-                  AND key LIKE ?
-                 ORDER BY rank
-                 LIMIT ? OFFSET ?`,
-            )
-            .all(matchQuery, `${namespacePrefix}%`, limit, offset) as SearchRow[])
-        : (this.database
-            .query(
-              `SELECT key, summary, text,
-                      bm25(memories_fts) AS rank,
-                      snippet(memories_fts, 2, '<mark>', '</mark>', '...', 18) AS excerpt
-                 FROM memories_fts
-                WHERE memories_fts MATCH ?
-                 ORDER BY rank
-                 LIMIT ? OFFSET ?`,
-            )
-            .all(matchQuery, limit, offset) as SearchRow[]);
+      const memoryStateFilter = this.normalizeStatusFilter(statusFilter);
+      const requiresMemoryJoin = Boolean(memoryStateFilter);
+      const fromClause = requiresMemoryJoin
+        ? "FROM memories_fts INNER JOIN memories ON memories.key = memories_fts.key"
+        : "FROM memories_fts";
 
-      const countRow = namespacePrefix
-        ? (this.database
-            .query(
-              `SELECT COUNT(1) AS total
-                 FROM memories_fts
-                WHERE memories_fts MATCH ?
-                  AND key LIKE ?`,
-            )
-            .get(matchQuery, `${namespacePrefix}%`) as SearchCountRow | null)
-        : (this.database
-            .query(
-              `SELECT COUNT(1) AS total
-                 FROM memories_fts
-                WHERE memories_fts MATCH ?`,
-            )
-            .get(matchQuery) as SearchCountRow | null);
+      const baseParams: Array<number | string> = [matchQuery];
+      const namespaceSql = namespacePrefix ? " AND memories_fts.key LIKE ?" : "";
+      if (namespacePrefix) {
+        baseParams.push(`${namespacePrefix}%`);
+      }
+
+      const baseRowsSql = `SELECT memories_fts.key AS key, memories_fts.summary AS summary, memories_fts.text AS text,
+                                  bm25(memories_fts) AS rank,
+                                  snippet(memories_fts, 2, '<mark>', '</mark>', '...', 18) AS excerpt
+                             ${fromClause}
+                            WHERE memories_fts MATCH ?${namespaceSql}`;
+      const rowsClause = appendMemoryStateFilter(baseRowsSql, baseParams, memoryStateFilter);
+      const rows = this.database
+        .query(`${rowsClause.sql} ORDER BY rank LIMIT ? OFFSET ?`)
+        .all(...rowsClause.params, limit, offset) as SearchRow[];
+
+      const baseCountSql = `SELECT COUNT(1) AS total
+                              ${fromClause}
+                             WHERE memories_fts MATCH ?${namespaceSql}`;
+      const countClause = appendMemoryStateFilter(baseCountSql, baseParams, memoryStateFilter);
+      const countRow = this.database.query(countClause.sql).get(...countClause.params) as SearchCountRow | null;
 
       const results = await Promise.all(rows.map((row) => this.formatResultRow(row)));
 
@@ -160,8 +161,46 @@ export class SearchService {
       };
     } catch (error) {
       console.error("SearchService: executeSearch failed", error);
+      if (error instanceof Error && /state filter|statusFilter|score/i.test(error.message)) {
+        throw new Error(`SearchService: invalid statusFilter - ${error.message}`);
+      }
+
       throw new Error("SearchService: search query execution failed");
     }
+  }
+
+  /**
+   * 规范化状态过滤输入。
+   *
+   * Debug hint: 若请求端报参数错误，先检查调用方传入的 `statusFilter` 结构。
+   */
+  private normalizeStatusFilter(statusFilter?: SearchStateFilterInput): MemoryStateFilter | undefined {
+    if (statusFilter === undefined) {
+      return undefined;
+    }
+
+    if (typeof statusFilter === "string") {
+      return { states: statusFilter };
+    }
+
+    if (Array.isArray(statusFilter)) {
+      return { states: statusFilter };
+    }
+
+    if (typeof statusFilter === "object" && statusFilter !== null) {
+      if (
+        statusFilter.states === undefined &&
+        statusFilter.excludeStates === undefined &&
+        statusFilter.scoreMin === undefined &&
+        statusFilter.scoreMax === undefined
+      ) {
+        return undefined;
+      }
+
+      return statusFilter;
+    }
+
+    throw new Error("SearchService: statusFilter must be state string, state array, or MemoryStateFilter object");
   }
 
   /**

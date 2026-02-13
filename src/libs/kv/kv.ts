@@ -59,6 +59,7 @@ export class KVMemory {
       out_degree: 0,
       access_count: 0,
       traverse_count: 0,
+      score: 50,
       status: MemoryStatusEnums.parse("active"),
     };
 
@@ -117,9 +118,16 @@ export class KVMemory {
     }
 
     const memory = memoryRowToMemory(current);
+    const nextMeta: MemoryMeta =
+      meta.score === undefined
+        ? {
+            ...meta,
+            score: memory.meta.score,
+          }
+        : meta;
     const updated: Memory = {
       ...memory,
-      meta,
+      meta: nextMeta,
     };
     const writable = memoryToWritableColumns(updated);
 
@@ -141,7 +149,17 @@ export class KVMemory {
     }
 
     const currentMemory = memoryRowToMemory(current);
-    const updatedMemory = mergeMemoryPatch(currentMemory, arg);
+    const patchedMemory = mergeMemoryPatch(currentMemory, arg);
+    const updatedMemory: Memory =
+      patchedMemory.meta.score === undefined
+        ? {
+            ...patchedMemory,
+            meta: {
+              ...patchedMemory.meta,
+              score: currentMemory.meta.score,
+            },
+          }
+        : patchedMemory;
     const writable = memoryToWritableColumns(updatedMemory);
 
     runInTransaction(this._database, () => {

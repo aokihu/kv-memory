@@ -15,6 +15,7 @@ import {
   SearchController,
 } from "./controller";
 import { SessionService, KVMemoryService } from "./service";
+import { initializeMemoryDecayScheduler } from "./libs/decay/scheduler-integration";
 
 const context: AppServerContext = {
   sessionService: new SessionService(),
@@ -22,6 +23,46 @@ const context: AppServerContext = {
 }
 
 const searchController = new SearchController(context.kvMemoryService);
+
+const decaySchedulerRuntime = initializeMemoryDecayScheduler({
+  mode: "http",
+});
+
+let hasHttpShutdownCleanupRun = false;
+
+function stopHttpDecayScheduler(): void {
+  if (hasHttpShutdownCleanupRun) {
+    return;
+  }
+
+  hasHttpShutdownCleanupRun = true;
+  decaySchedulerRuntime.stop();
+}
+
+function registerHttpShutdownHooks(): void {
+  process.on("SIGINT", () => {
+    console.info("[http] SIGINT received, stopping decay scheduler");
+    stopHttpDecayScheduler();
+    process.exit(0);
+  });
+
+  process.on("SIGTERM", () => {
+    console.info("[http] SIGTERM received, stopping decay scheduler");
+    stopHttpDecayScheduler();
+    process.exit(0);
+  });
+
+  // Debug entry: if scheduler remains running after server stop, confirm beforeExit hook execution.
+  process.on("beforeExit", () => {
+    stopHttpDecayScheduler();
+  });
+
+  process.on("exit", () => {
+    stopHttpDecayScheduler();
+  });
+}
+
+registerHttpShutdownHooks();
 
 export const server = Bun.serve({
   port: 3030,

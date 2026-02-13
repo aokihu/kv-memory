@@ -5,3 +5,4 @@ export {updateMemoryController} from './updateMemory'
 export { updateMemoryKeyController } from "./updateMemoryKey";
 export { SearchController } from './searchController';
 export { registerMemoryStatsController, getMemoryStatsHandler } from "./memoryStats";
+export { bulkMemoryReadController } from "./bulkMemory";

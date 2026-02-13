@@ -1,18 +1,15 @@
-import { describe, test, beforeAll, afterAll, expect } from 'bun:test'
+import { describe, test, beforeAll, expect } from 'bun:test'
 import {server} from '../src'
 
 describe("记忆系统测试用例", () => {
 
-    const BASE_MEMORY_KEY = "test_key";
-    const RENAME_OLD_KEY = "rename_old_key";
-    const RENAME_NEW_KEY = "rename_new_key";
-    const RENAME_EXISTING_KEY = "rename_existing_key";
-    const RENAME_CONFLICT_SOURCE_KEY = "rename_conflict_source_key";
+    const RUN_SUFFIX = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const BASE_MEMORY_KEY = `test_key_${RUN_SUFFIX}`;
+    const RENAME_OLD_KEY = `rename_old_key_${RUN_SUFFIX}`;
+    const RENAME_NEW_KEY = `rename_new_key_${RUN_SUFFIX}`;
+    const RENAME_EXISTING_KEY = `rename_existing_key_${RUN_SUFFIX}`;
+    const RENAME_CONFLICT_SOURCE_KEY = `rename_conflict_source_key_${RUN_SUFFIX}`;
     let sessionId: string;
-
-    afterAll(async () => {
-        await Bun.file("kv.db").exists() && await Bun.file("kv.db").delete()
-    })
 
     test("获取Session", async () => {
 

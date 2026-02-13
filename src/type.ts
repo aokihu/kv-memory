@@ -76,8 +76,18 @@ export type McpOutputFormat = "json" | "toon";
 export type McpMemoryGetParams = {
   key: string;
   session?: string;
+  bulkRead?: boolean | "true" | "false";
+  depth?: number;
+  breadth?: number;
+  total?: number;
   sortLinks?: SortLinksInput;
   output_format?: McpOutputFormat;
+};
+
+export type BulkReadMetadata = {
+  depthReached: number;
+  totalRetrieved: number;
+  duplicatesSkipped: number;
 };
 
 export type McpMemorySearchParams = {

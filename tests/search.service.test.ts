@@ -5,8 +5,9 @@
  * - If import mocking fails, check `mock.module` target path first.
  */
 
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { Memory } from "../src/type";
+import { SearchService } from "../src/service/searchService";
 
 type FakeSearchRow = {
   key: string;
@@ -55,18 +56,6 @@ const fakeDatabase = {
   },
 };
 
-mock.module("../src/libs/kv/db", () => {
-  return {
-    getDatabase: () => fakeDatabase,
-    initDatabase: () => fakeDatabase,
-    getDatabaseConfig: () => ({
-      searchEnabled: fakeDbState.searchEnabled,
-    }),
-  };
-});
-
-const { SearchService } = await import("../src/service/searchService");
-
 function createService(memoryMap: Record<string, Memory | undefined>) {
   const kv = {
     async get(key: string) {
@@ -74,7 +63,10 @@ function createService(memoryMap: Record<string, Memory | undefined>) {
     },
   };
 
-  return new SearchService(kv as never);
+  return new SearchService(kv as never, {
+    database: fakeDatabase as never,
+    searchEnabled: fakeDbState.searchEnabled,
+  });
 }
 
 beforeEach(() => {
@@ -84,10 +76,6 @@ beforeEach(() => {
   fakeDbState.searchEnabled = true;
   fakeDbState.capturedAllParams = [];
   fakeDbState.capturedGetParams = [];
-});
-
-afterAll(() => {
-  mock.restore();
 });
 
 describe("SearchService", () => {

@@ -211,6 +211,8 @@ curl -X GET "http://localhost:3000/api/memories/stats?exportFormat=json"
 
 系统提供MCP（Model Context Protocol）工具，与HTTP API保持行为一致性。MCP工具支持相同的参数和排序逻辑。
 
+> **注意**：HTTP API保持不变，MCP工具作为补充接口提供相同功能。批量读取功能在HTTP API中通过`GET /api/memories/{key}/bulk`端点提供，在MCP中通过独立的`bulk_read_memory`工具提供。
+
 ### 链接排序参数（sortLinks）
 
 所有记忆获取和搜索接口都支持 `sortLinks` 参数，用于控制返回的记忆链接数组是否按综合得分排序。
@@ -260,11 +262,124 @@ curl -X GET "http://localhost:3000/search?q=quantum&sortLinks=false"
 - 参数验证一致：支持相同的值类型和错误处理
 - 排序结果一致：相同输入产生相同的links顺序
 
+## 批量读取记忆 API
+
+系统提供批量读取记忆功能，支持深度优先遍历关联记忆，适用于获取完整上下文场景。
+
+### 端点
+
+```
+GET /api/memories/{key}/bulk
+```
+
+### 请求参数
+
+| 参数 | 类型 | 必填 | 默认值 | 范围 | 说明 |
+|------|------|------|--------|------|------|
+| `depth` | `integer` | 否 | `3` | 1-6 | 遍历深度限制，最大6层 |
+| `breadth` | `integer` | 否 | `5` | 1-20 | 每层最大关联记忆数 |
+| `total` | `integer` | 否 | `20` | 1-50 | 总计返回记忆数上限 |
+
+### 响应结构
+
+```json
+{
+  "ok": true,
+  "data": {
+    "targetMemory": {
+      "key": "project:architecture",
+      "value": {
+        "summary": "系统架构设计",
+        "text": "详细的架构设计文档...",
+        "links": [...]
+      },
+      "meta": { "score": 85, ... }
+    },
+    "associatedMemories": [
+      {
+        "key": "project:database",
+        "value": { ... },
+        "meta": { ... },
+        "retrievalInfo": {
+          "depth": 1,
+          "weight": 0.85,
+          "path": ["project:architecture"]
+        }
+      }
+    ],
+    "metadata": {
+      "depthReached": 3,
+      "totalRetrieved": 15,
+      "duplicatesSkipped": 2,
+      "executionTimeMs": 45
+    }
+  }
+}
+```
+
+### 使用示例
+
+#### 基础请求（使用默认值）
+
+```bash
+curl -X GET "http://localhost:3000/api/memories/project:architecture/bulk"
+```
+
+#### 自定义参数请求
+
+```bash
+curl -X GET "http://localhost:3000/api/memories/project:architecture/bulk?depth=4&breadth=8&total=30"
+```
+
+### 错误响应
+
+#### 参数超出范围
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Parameter 'depth' exceeds maximum value of 6",
+    "field": "depth",
+    "maxAllowed": 6,
+    "provided": 10
+  }
+}
+```
+
+#### 记忆不存在
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Memory with key 'non:existent' not found"
+  }
+}
+```
+
+### 算法说明
+
+批量读取使用深度优先遍历（DFS）算法：
+
+1. **遍历策略**：深度优先，优先探索深层关联
+2. **排序逻辑**：按 `link_weight × memory_score` 降序排列
+3. **去重机制**：基于 memory key 防止重复读取
+4. **限制控制**：达到任一限制立即停止遍历
+
+详细算法说明参见：`docs/MEMORY_ALGORITHM.md`
+
+---
+
 ## 相关文档链接
 
 - 记忆衰退算法说明：`docs/MEMORY_ALGORITHM.md`
 - 客户端迁移指南（移除 domain/type）：`docs/CLIENT_MIGRATION_GUIDE_DOMAIN_TYPE_REMOVAL.md`
 - MCP工具使用指南：`MCP-README.md`
+- **批量读取用户指南**：`docs/BULK_READ_GUIDE.md` ⭐ 新增
 - OpenSpec 变更（memory-api）：`openspec/changes/implement-memory-decay-algorithm/specs/memory-api/spec.md`
 - OpenSpec 变更（memory-decay-algorithm）：`openspec/changes/implement-memory-decay-algorithm/specs/memory-decay-algorithm/spec.md`
 - OpenSpec 变更（MCP链接排序）：`openspec/changes/add-sortlinks-to-mcp-tools/`
+- **OpenSpec 批量读取变更**：`openspec/changes/add-bulk-memory-read/` ⭐ 新增

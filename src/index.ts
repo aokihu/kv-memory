@@ -13,6 +13,7 @@ import {
   updateMemoryController,
   updateMemoryKeyController,
   SearchController,
+  bulkMemoryReadController,
 } from "./controller";
 import { SessionService, KVMemoryService } from "./service";
 import { initializeMemoryDecayScheduler } from "./libs/decay/scheduler-integration";
@@ -99,6 +100,9 @@ export const server = Bun.serve({
           return Response.json({ success: false, message: "fulltext route failed" }, { status: 500 });
         }
       },
+    },
+    "/api/memories/:key/bulk": {
+      GET: (req) => bulkMemoryReadController(req, context),
     },
   }
 });

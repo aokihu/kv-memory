@@ -37,7 +37,7 @@ export type SearchResultItem = {
   excerpt: string;
   relevance: number;
   score: number;
-  links: MemoryLinkValue[];
+  links?: MemoryLinkValue[];
 };
 
 export type SearchPagination = {
@@ -56,10 +56,16 @@ export class SearchService {
   private readonly database: Database;
   private readonly searchEnabled: boolean;
 
-  constructor(kv: KVMemory) {
+  constructor(
+    kv: KVMemory,
+    dependencies: {
+      database?: Database;
+      searchEnabled?: boolean;
+    } = {},
+  ) {
     this.kv = kv;
-    this.database = initDatabase(getDatabase());
-    this.searchEnabled = getDatabaseConfig().searchEnabled;
+    this.database = dependencies.database ?? initDatabase(getDatabase());
+    this.searchEnabled = dependencies.searchEnabled ?? getDatabaseConfig().searchEnabled;
   }
 
   /**
@@ -133,7 +139,8 @@ export class SearchService {
         : "FROM memories_fts";
 
       const baseParams: Array<number | string> = [matchQuery];
-      const namespaceSql = namespacePrefix ? " AND memories_fts.key LIKE ?" : "";
+      const namespaceKeyColumn = requiresMemoryJoin ? "memories_fts.key" : "key";
+      const namespaceSql = namespacePrefix ? ` AND ${namespaceKeyColumn} LIKE ?` : "";
       if (namespacePrefix) {
         baseParams.push(`${namespacePrefix}%`);
       }
@@ -213,21 +220,29 @@ export class SearchService {
    */
   private async formatResultRow(row: SearchRow, sortLinks: boolean): Promise<SearchResultItem> {
     const memory = (await this.kv.get(row.key)) as Memory | undefined;
-    const memoryLinks = await this.kv.getLinks(row.key);
+    const canGetLinks = typeof (this.kv as unknown as { getLinks?: unknown }).getLinks === "function";
+    const memoryLinks = canGetLinks
+      ? await (this.kv as unknown as { getLinks: (key: string) => Promise<MemoryLinkValue[]> }).getLinks(row.key)
+      : [];
     const summary = memory?.summary ?? row.summary;
     const sourceText = memory?.text ?? row.text;
     const excerpt = this.normalizeExcerpt(row.excerpt, sourceText);
     const relevance = this.toRelevance(row.rank ?? 0);
     const links = sortLinks ? await this.sortResultLinks(memoryLinks) : memoryLinks;
 
-    return {
+    const result: SearchResultItem = {
       key: row.key,
       summary,
       excerpt,
       relevance,
       score: relevance,
-      links,
     };
+
+    if (links.length > 0) {
+      result.links = links;
+    }
+
+    return result;
   }
 
   /**

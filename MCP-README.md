@@ -5,6 +5,14 @@
 - [安装与设置](#安装与设置)
 - [快速开始](#快速开始)
 - [可用工具](#可用工具)
+  - [`session_new`](#session_new)
+  - [`memory_add`](#memory_add)
+  - [`memory_get`](#memory_get)
+  - [`memory_update`](#memory_update)
+  - [`memory_rename`](#memory_rename)
+  - [`memory_search`](#memory_search)
+  - [`memory_fulltext_search`](#memory_fulltext_search)
+  - [`bulk_read_memory`](#bulk_read_memory)
 - [可用资源](#可用资源)
 - [可用提示](#可用提示)
 - [传输方式](#传输方式)
@@ -114,7 +122,8 @@
 
 ### `memory_get`
 
-- **用途**：根据 `key` 读取记忆，同时维护 `Session` 中 `last_memory_key`，触发历史遍历（`traverseMemory`）以便做上下文扩散。
+- **用途**：根据 `key` 读取**单条**记忆，同时维护 `Session` 中 `last_memory_key`，触发历史遍历（`traverseMemory`）以便做上下文扩散。
+- **说明**：此为**单条读取工具**，只返回指定 `key` 的单个记忆。如需批量读取多条关联记忆，请使用 [`bulk_read_memory`](#bulk_read_memory) 工具。
 - **参数**：
 
   ```json
@@ -311,6 +320,159 @@
   - `KVDB_SEARCH_ENABLED`：是否启用搜索功能，默认 `true`
   - `KVDB_SEARCH_DEFAULT_LIMIT`：默认搜索结果数量，默认 `20`
   - `KVDB_SEARCH_MAX_LIMIT`：最大搜索结果数量，默认 `100`
+
+### `bulk_read_memory`
+
+- **用途**：批量读取指定记忆及其关联记忆，支持通过深度优先遍历获取完整上下文网络。适用于需要获取某个主题相关完整记忆链路的场景。
+- **说明**：此为**批量读取工具**，与 `memory_get`（单条读取）不同，它会自动遍历关联链路并返回多条相关记忆。
+- **参数**：
+
+  ```json
+  {
+    "key": "project:architecture",
+    "session": "session_key_here",
+    "depth": 3,
+    "breadth": 5,
+    "total": 20,
+    "sortLinks": true,
+    "output_format": "json"
+  }
+  ```
+
+- **参数说明**：
+  - `key`：目标记忆的key，**必填**。作为遍历的起始节点。
+  - `session`：可选的会话ID，用于namespace过滤和上下文追踪。提供有效session时，只返回该session对应namespace下的记忆。
+  - `depth`：遍历深度限制，可选，默认`3`，范围`1-6`。控制遍历的层级深度，防止无限递归。
+  - `breadth`：每层最大关联记忆数，可选，默认`5`，范围`1-20`。控制每层最多探索的关联记忆数量。
+  - `total`：总计返回记忆数上限，可选，默认`20`，范围`1-50`。包括目标记忆和所有关联记忆的总数限制。
+  - `sortLinks`：控制返回的links数组是否按综合得分排序，可选，支持boolean类型或字符串`"true"`/`"false"`，默认`true`。
+  - `output_format`：输出格式，可选`toon`或`json`，默认`toon`。JSON格式便于程序解析，TOON格式便于人工阅读。
+
+- **行为**：
+  1. 验证`key`参数，目标记忆必须存在。
+  2. 如果提供了`session`，验证session有效性并提取对应的namespace，用于过滤返回结果。
+  3. 从目标记忆开始，按照深度优先策略遍历关联链路（通过`links`字段）。
+  4. 应用`depth`、`breadth`、`total`参数限制遍历范围，防止返回过多数据。
+  5. 收集所有访问到的记忆节点，包含目标记忆和关联记忆。
+  6. 根据`sortLinks`参数决定是否对每条记忆的`links`数组进行排序。
+  7. 按照`output_format`参数返回格式化结果。
+
+- **返回结构**：
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "targetMemory": {
+        "key": "project:architecture",
+        "value": {
+          "summary": "系统架构设计",
+          "text": "详细的架构设计文档...",
+          "links": [
+            {"targetKey": "project:database", "strength": 0.9}
+          ]
+        },
+        "meta": {
+          "createdAt": "2024-01-15T10:30:00Z",
+          "lastAccessAt": "2024-01-15T14:20:00Z",
+          "accessCount": 5,
+          "score": 85
+        }
+      },
+      "associatedMemories": [
+        {
+          "key": "project:database",
+          "value": {
+            "summary": "数据库设计方案",
+            "text": "数据库选型与结构设计...",
+            "links": [...]
+          },
+          "meta": {...},
+          "retrievalInfo": {
+            "depth": 1,
+            "weight": 0.9,
+            "path": ["project:architecture", "project:database"]
+          }
+        }
+      ],
+      "metadata": {
+        "depthReached": 3,
+        "totalRetrieved": 15,
+        "duplicatesSkipped": 2,
+        "traversalTimeMs": 45
+      }
+    }
+  }
+  ```
+
+- **使用示例**：
+
+  **基础批量读取**（使用默认参数）：
+
+  ```json
+  {
+    "tool": "bulk_read_memory",
+    "arguments": {
+      "key": "project:architecture",
+      "output_format": "json"
+    }
+  }
+  ```
+
+  **自定义遍历参数**（深度探索）：
+
+  ```json
+  {
+    "tool": "bulk_read_memory",
+    "arguments": {
+      "key": "project:architecture",
+      "depth": 5,
+      "breadth": 10,
+      "total": 40,
+      "sortLinks": true,
+      "output_format": "json"
+    }
+  }
+  ```
+
+  **带Session的批量读取**（Namespace过滤）：
+
+  ```json
+  {
+    "tool": "bulk_read_memory",
+    "arguments": {
+      "key": "project:architecture",
+      "session": "your_session_key_here",
+      "depth": 3,
+      "output_format": "json"
+    }
+  }
+  ```
+
+- **故障排除**：
+
+  - **`bulk_read_memory`返回"记忆不存在"**：
+    - 确认`key`拼写正确，区分大小写
+    - 使用`memory_get`验证记忆是否存在
+    - 检查是否需要添加namespace前缀（如`session_key:memory_key`）
+
+  - **返回的关联记忆数量少于预期**：
+    - 检查目标记忆的`links`数组是否为空
+    - 查看返回的`metadata.duplicatesSkipped`，可能有关联记忆因重复被跳过
+    - 调整`depth`、`breadth`、`total`参数扩大搜索范围
+    - 如果使用了`session`过滤，确认该namespace下确实存在关联记忆
+
+  - **遍历过慢或返回数据过大**：
+    - 减小`depth`参数（建议从3开始逐步增加）
+    - 减小`breadth`参数限制每层探索数量
+    - 减小`total`参数限制总返回数量
+    - 避免对具有大量关联的"枢纽"记忆进行深度遍历
+
+  - **参数验证错误**：
+    - 确认`depth`在1-6范围内
+    - 确认`breadth`在1-20范围内
+    - 确认`total`在1-50范围内
+    - 确认`key`参数不为空且为有效字符串
 
 ## 可用资源
 
@@ -543,3 +705,115 @@ await client.disconnect();
     - 如果返回 `invalid session`，检查 session 是否已过期（默认 3 分钟）
     - 重新调用 `session_new` 获取新 session
     - 确认 session 字符串拼写正确
+
+
+## 批量读取记忆工具
+
+系统支持批量读取关联记忆，通过深度优先遍历获取完整上下文。
+
+### `memory_bulk_read`
+
+- **用途**：批量读取指定记忆及其关联记忆，支持深度优先遍历
+- **参数**：
+
+  ```json
+  {
+    "key": "project:architecture",
+    "session": "session_key_here",
+    "depth": 3,
+    "breadth": 5,
+    "totalLimit": 20,
+    "sortLinks": true,
+    "output_format": "json"
+  }
+  ```
+
+- **参数说明**：
+  - `key`：目标记忆的key，必填
+  - `session`：可选的会话ID，用于namespace过滤
+  - `depth`：遍历深度限制，可选，默认3，范围1-6
+  - `breadth`：每层最大关联记忆数，可选，默认5，范围1-20
+  - `totalLimit`：总计返回记忆数上限，可选，默认20，范围1-50
+  - `sortLinks`：控制返回的links数组是否排序，可选，默认true
+  - `output_format`：输出格式，可选`toon`或`json`，默认`toon`
+
+- **返回示例**（JSON格式）：
+
+  ```json
+  {
+    "success": true,
+    "data": {
+      "targetMemory": {
+        "key": "project:architecture",
+        "value": {
+          "summary": "系统架构设计",
+          "text": "详细的架构设计文档...",
+          "links": [...]
+        },
+        "meta": { "score": 85 }
+      },
+      "associatedMemories": [
+        {
+          "key": "project:database",
+          "value": { },
+          "meta": { },
+          "retrievalInfo": {
+            "depth": 1,
+            "weight": 0.85
+          }
+        }
+      ],
+      "metadata": {
+        "depthReached": 3,
+        "totalRetrieved": 15,
+        "duplicatesSkipped": 2
+      }
+    }
+  }
+  ```
+
+### 使用示例
+
+#### 基础批量读取
+
+```json
+{
+  "tool": "memory_bulk_read",
+  "arguments": {
+    "key": "project:architecture",
+    "output_format": "json"
+  }
+}
+```
+
+#### 自定义深度和广度
+
+```json
+{
+  "tool": "memory_bulk_read",
+  "arguments": {
+    "key": "project:architecture",
+    "depth": 4,
+    "breadth": 8,
+    "totalLimit": 30,
+    "output_format": "json"
+  }
+}
+```
+
+### 批量读取故障排除
+
+- **`memory_bulk_read` 返回记忆不存在**：
+  - 确认key拼写正确
+  - 使用 `memory_get` 验证记忆是否存在
+  - 检查是否需要添加namespace前缀
+
+- **返回的关联记忆数量少于预期**：
+  - 检查目标记忆的links数组是否为空
+  - 查看metadata中的duplicatesSkipped，可能有关联记忆因重复被跳过
+  - 调整depth、breadth、totalLimit参数
+
+- **参数验证错误**：
+  - 确认depth在1-6范围内
+  - 确认breadth在1-20范围内
+  - 确认totalLimit在1-50范围内

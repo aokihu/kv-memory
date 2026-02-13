@@ -41,8 +41,8 @@ export class KVMemory {
 
     // Mixed access with other SQLite clients (e.g. legacy Keyv session storage)
     // may hit transient write locks; WAL + busy timeout improves interoperability.
-    this._database.run("PRAGMA journal_mode = WAL;");
-    this._database.run("PRAGMA busy_timeout = 5000;");
+    this._database.exec("PRAGMA journal_mode = WAL;");
+    this._database.exec("PRAGMA busy_timeout = 5000;");
   }
 
   async add(key: string, arg: MemoryNoMeta, links: MemoryLinkValue[] = []) {
@@ -98,6 +98,39 @@ export class KVMemory {
     return memoryRowToMemory(row);
   }
 
+  /**
+   * Batch-read memories by keys.
+   *
+   * Debug entry point: if batch result misses expected keys, check input key list
+   * and verify generated placeholder count in SQL IN clause.
+   */
+  async getMany(keys: string[]): Promise<Record<string, Memory | undefined>> {
+    const uniqueKeys = [...new Set(keys.filter((item) => item.length > 0))];
+    if (uniqueKeys.length === 0) {
+      return {};
+    }
+
+    const placeholders = uniqueKeys.map(() => "?").join(", ");
+    const rows = this._database
+      .query(
+        `SELECT key, summary, text, meta, created_at
+         FROM memories
+         WHERE key IN (${placeholders})`,
+      )
+      .all(...uniqueKeys) as MemoryRow[];
+
+    const memoriesByKey: Record<string, Memory | undefined> = {};
+    for (const key of uniqueKeys) {
+      memoriesByKey[key] = undefined;
+    }
+
+    for (const row of rows) {
+      memoriesByKey[row.key] = memoryRowToMemory(row);
+    }
+
+    return memoriesByKey;
+  }
+
   async getLinks(key: string): Promise<MemoryLinkValue[]> {
     const rows = this._database
       .query(
@@ -109,6 +142,47 @@ export class KVMemory {
       .all(key) as MemoryLinkRelationReadRow[];
 
     return rows.map((row) => relationRowToMemoryLink(row));
+  }
+
+  /**
+   * Batch-read outgoing links for multiple memories.
+   *
+   * Debug entry point: if one source key has empty links unexpectedly,
+   * verify `from_key` values in `memory_links` and input key normalization.
+   */
+  async getLinksMany(keys: string[]): Promise<Record<string, MemoryLinkValue[]>> {
+    const uniqueKeys = [...new Set(keys.filter((item) => item.length > 0))];
+    const linksByKey: Record<string, MemoryLinkValue[]> = {};
+
+    for (const key of uniqueKeys) {
+      linksByKey[key] = [];
+    }
+
+    if (uniqueKeys.length === 0) {
+      return linksByKey;
+    }
+
+    const placeholders = uniqueKeys.map(() => "?").join(", ");
+    const rows = this._database
+      .query(
+        `SELECT from_key, to_key, link_type, term, weight
+         FROM memory_links
+         WHERE from_key IN (${placeholders})
+         ORDER BY id`,
+      )
+      .all(...uniqueKeys) as Array<
+      MemoryLinkRelationReadRow & {
+        from_key: string;
+      }
+    >;
+
+    for (const row of rows) {
+      const links = linksByKey[row.from_key] ?? [];
+      links.push(relationRowToMemoryLink(row));
+      linksByKey[row.from_key] = links;
+    }
+
+    return linksByKey;
   }
 
   async setMeta(key: string, meta: MemoryMeta) {

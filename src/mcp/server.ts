@@ -25,7 +25,7 @@ import { KVMemoryService, SessionService } from "../service";
 
 export const server = new FastMCP({
   name: "kvdb-mem",
-  version: "0.2.0",
+  version: "1.6.0",
   instructions:
     "使用Key-Value数据库存储记忆,并通过记忆连接(Link)将各个记忆连接起来,模仿人类的记忆连接方式.",
   health: {

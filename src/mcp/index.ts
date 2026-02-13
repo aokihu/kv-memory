@@ -32,9 +32,19 @@ function registerMcpShutdownHooks(cleanup: () => void): void {
 }
 
 if (import.meta.main) {
-  const decaySchedulerRuntime = initializeMemoryDecayScheduler({
-    mode: "mcp",
-  });
+  let decaySchedulerRuntime: ReturnType<typeof initializeMemoryDecayScheduler> | undefined;
+
+  try {
+    // 尝试初始化衰退调度器，但允许失败
+    decaySchedulerRuntime = initializeMemoryDecayScheduler({
+      mode: "mcp",
+    });
+    console.info("[mcp] Memory decay scheduler initialized successfully");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[mcp] Failed to initialize memory decay scheduler: ${message}`);
+    console.warn("[mcp] Continuing without decay scheduler - memory scores will not be updated automatically");
+  }
 
   let hasMcpShutdownCleanupRun = false;
 
@@ -44,7 +54,17 @@ if (import.meta.main) {
     }
 
     hasMcpShutdownCleanupRun = true;
-    decaySchedulerRuntime.stop();
+    
+    // 只有在调度器成功初始化时才停止
+    if (decaySchedulerRuntime) {
+      try {
+        decaySchedulerRuntime.stop();
+        console.info("[mcp] Memory decay scheduler stopped");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[mcp] Error stopping decay scheduler: ${message}`);
+      }
+    }
   };
 
   registerMcpShutdownHooks(cleanup);

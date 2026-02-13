@@ -119,7 +119,17 @@ export function initializeMemoryDecayScheduler(
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
   const taskId = options.taskId ?? DEFAULT_MEMORY_DECAY_TASK_ID;
   const scheduler = new Scheduler();
-  const db = new Database(dbPath);
+  
+  // 尝试打开数据库，如果失败则抛出更详细的错误
+  let db: Database;
+  try {
+    db = new Database(dbPath);
+    // 测试数据库连接是否有效
+    db.exec("SELECT 1");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to open database at ${dbPath}: ${message}. Make sure the database file exists and is a valid SQLite database.`);
+  }
 
   const runNow = createMemoryDecayTaskExecutor(db, options.mode, config);
 

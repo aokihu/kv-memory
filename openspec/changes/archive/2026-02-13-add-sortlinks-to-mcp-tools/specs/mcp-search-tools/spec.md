@@ -3,7 +3,7 @@
 ## Purpose
 TBD - created by syncing change add-memory-search-with-mcp-tools. Update Purpose after archive.
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: MCP search tools
 The system SHALL provide MCP tools for memory search functionality, enabling Agents to search memories through the MCP protocol. The search tools SHALL support optional `sortLinks` parameter for controlling link array sorting in search results.

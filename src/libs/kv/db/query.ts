@@ -601,6 +601,53 @@ export function buildMemorySortOrderByClause(
   return `ORDER BY ${orderFragments.join(", ")}`;
 }
 
+const DEFAULT_LINK_SORT_SCORE = 50;
+
+/**
+ * Sort links by `link.weight * linkedMemory.meta.score` in descending order.
+ *
+ * Tie-break order:
+ * 1) Combined score (desc)
+ * 2) Link weight (desc)
+ * 3) Link key (asc, alphabetical)
+ *
+ * Debug hint: if sorted order looks unexpected, inspect each link's resolved
+ * score from `linkedMemoriesByKey` and verify missing scores fallback to 50.
+ */
+export function sortLinksByCombinedScore(
+  links: MemoryLinkValue[],
+  linkedMemoriesByKey: Record<string, Memory | undefined>,
+): MemoryLinkValue[] {
+  const resolveScore = (link: MemoryLinkValue): number => {
+    const linkedMemory = link.key ? linkedMemoriesByKey[link.key] : undefined;
+    const score = linkedMemory?.meta.score;
+
+    if (typeof score === "number" && Number.isFinite(score)) {
+      return score;
+    }
+
+    return DEFAULT_LINK_SORT_SCORE;
+  };
+
+  return [...links].sort((left, right) => {
+    const leftCombinedScore = left.weight * resolveScore(left);
+    const rightCombinedScore = right.weight * resolveScore(right);
+    const combinedScoreDiff = rightCombinedScore - leftCombinedScore;
+    if (combinedScoreDiff !== 0) {
+      return combinedScoreDiff;
+    }
+
+    const weightDiff = right.weight - left.weight;
+    if (weightDiff !== 0) {
+      return weightDiff;
+    }
+
+    const leftKey = left.key ?? "";
+    const rightKey = right.key ?? "";
+    return leftKey.localeCompare(rightKey);
+  });
+}
+
 /**
  * Validate one score boundary from filter input.
  *

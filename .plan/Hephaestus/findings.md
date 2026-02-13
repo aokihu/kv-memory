@@ -1,9 +1,12 @@
 # Findings
 
-## TASK-007-UPDATE-MCP-TESTS
-- `memory_search` 与 `memory_fulltext_search` 的多个测试未传 `session`，会与“session 必填”冲突。
-- 明确需要删除/改造用例：`memory_search without session keeps global search behavior`。
-- 参数校验测试当前用例也缺 `session`，需要补充有效 `session` 以确保仅校验目标字段。
-- `toon` 输出测试的两个工具调用都缺 `session`，需要为每个调用提供有效 `session`。
-- 已将成功路径测试改为：先 `session_new` 创建命名空间会话，再写入同命名空间 key，确保结果稳定。
-- 已删除旧的“无 session 全局搜索”行为测试，并新增 `memory_fulltext_search` 的无效 session 错误测试。
+## 2026-02-13
+- `src/controller/getMemory.ts` requires `sortLinks` validation alignment with `src/controller/searchController.ts`.
+- Expected behavior from task: accept boolean and string `"true"`/`"false"`, default to `true`, and return clear validation errors.
+- `searchController.ts` uses `z.preprocess` to normalize empty/boolean/string values, then `z.boolean().optional().default(true)`.
+- In current Zod version, boolean schema custom message uses `{ message: ... }` instead of `invalid_type_error`.
+- MCP search tools currently define local schemas inside `memorySearch.ts` and `memoryFulltextSearch.ts`; they do not use `src/mcp/schemas/search.ts`.
+- `src/service/searchService.ts` already supports `sortLinks` and defaults to `true`; MCP gap is mainly schema wiring and `KVMemoryService` argument forwarding.
+- `src/service/kvmemory.ts#getMemory` currently has no `sortLinks` argument and always returns DB link order; this must be extended for HTTP/MCP consistency.
+- MCP test helper `callRegisteredTool` returns parse errors via `isError: true` with first issue message; suitable for validating invalid `sortLinks` values.
+- Existing test cleanup only matched keys prefixed directly with `mcp_search_test_`; namespace-prefixed keys (`namespace:mcp_search_test_*`) require `%:mcp_search_test_%` pattern for reliable cleanup.

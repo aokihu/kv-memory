@@ -3,7 +3,7 @@
 ## Purpose
 TBD - created by archiving change remove-memory-domain-type-fields.
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: MCP tools without domain and type
 MCP tools for memory operations SHALL NOT include domain and type parameters. MCP tools SHALL include search tools for memory search functionality. MCP tools SHALL support optional `sortLinks` parameter for controlling link array sorting.
@@ -50,7 +50,7 @@ MCP prompts for memory capture SHALL be updated to reflect removed fields. MCP p
 - **AND** prompts MAY mention link sorting capabilities
 
 ### Requirement: MCP schema validation
-MCP schemas for memory operations SHALL validate against new structure. MCP schemas for search tools SHALL be properly defined.
+MCP schemas for memory operations SHALL validate against new structure. MCP schemas for search tools SHALL be properly defined. MCP schemas SHALL include validation for `sortLinks` parameter.
 
 #### Scenario: MemoryValueSchema validation
 - **WHEN** MCP validates memory data

@@ -56,6 +56,11 @@ export const MemoryWithLinksSchema = MemorySchema.extend({
   links: z.array(MemoryLink).default([]),
 });
 
+export const SortLinksInputSchema = z.union([
+  z.boolean(),
+  z.enum(["true", "false"]),
+]);
+
 export type MemoryMeta = z.infer<typeof MemoryMetaSchema> & {
   score?: number;
 };
@@ -63,6 +68,48 @@ export type Memory = z.infer<typeof MemorySchema>;
 export type MemoryNoMeta = z.infer<typeof MemoryNoMetaSchema>;
 export type MemoryWithLinks = z.infer<typeof MemoryWithLinksSchema>;
 export type MemoryLinkValue = z.infer<typeof MemoryLink>;
+export type SortLinksInput = z.infer<typeof SortLinksInputSchema>;
+export type SortLinksValue = boolean;
+
+export type McpOutputFormat = "json" | "toon";
+
+export type McpMemoryGetParams = {
+  key: string;
+  session?: string;
+  sortLinks?: SortLinksInput;
+  output_format?: McpOutputFormat;
+};
+
+export type McpMemorySearchParams = {
+  query: string;
+  session: string;
+  limit?: number;
+  offset?: number;
+  sortLinks?: SortLinksInput;
+  output_format?: McpOutputFormat;
+};
+
+export type McpMemoryFulltextSearchParams = {
+  keywords: string;
+  operator?: "AND" | "OR";
+  session: string;
+  limit?: number;
+  offset?: number;
+  sortLinks?: SortLinksInput;
+  output_format?: McpOutputFormat;
+};
+
+export type McpSuccessResponse<T> = {
+  success: true;
+  data: T;
+};
+
+export type McpErrorResponse = {
+  success: false;
+  message: string;
+};
+
+export type McpResponse<T> = McpSuccessResponse<T> | McpErrorResponse;
 
 /* ----- App ----- */
 

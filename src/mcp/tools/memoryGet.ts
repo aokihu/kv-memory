@@ -35,7 +35,7 @@ export const createMemoryGetTool = (
       }
 
       const memory: MemoryNoMetaWithLinkSummary | undefined =
-        await kvMemoryService.getMemory(args.key);
+        await kvMemoryService.getMemory(args.key, args.sortLinks);
 
       if (!memory) {
         return JSON.stringify(

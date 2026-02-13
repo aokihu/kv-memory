@@ -8,9 +8,33 @@
 import { z } from 'zod';
 import { KVMemoryService, SessionService } from '../service';
 
+const SortLinksSchema = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') {
+      return true;
+    }
+
+    if (normalized === 'false') {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean().optional().default(true));
+
 const SearchQuerySchema = z.object({
   q: z.string().trim().min(1, 'q is required'),
   session: z.string().optional(),
+  sortLinks: SortLinksSchema,
   limit: z.coerce.number().int().min(1).max(100).optional().default(10),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
@@ -19,6 +43,7 @@ const FulltextQuerySchema = z.object({
   keywords: z.string().trim().min(1, 'keywords is required'),
   session: z.string().optional(),
   operator: z.enum(['AND', 'OR']).optional().default('OR'),
+  sortLinks: SortLinksSchema,
   limit: z.coerce.number().int().min(1).max(100).optional().default(10),
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
@@ -26,6 +51,7 @@ const FulltextQuerySchema = z.object({
 type SearchQueryInput = {
   q?: string;
   session?: string;
+  sortLinks?: string;
   limit?: string;
   offset?: string;
 };
@@ -34,6 +60,7 @@ type FulltextQueryInput = {
   keywords?: string;
   session?: string;
   operator?: string;
+  sortLinks?: string;
   limit?: string;
   offset?: string;
 };
@@ -49,6 +76,13 @@ export class SearchController {
 
   /**
    * 处理基础关键词搜索。
+   *
+   * Query 参数:
+   * - `q`: 搜索关键词（必填）
+   * - `session`: 可选会话 ID，用于 namespace 隔离
+   * - `sortLinks`: 是否按综合得分排序 links（可选，默认 true）
+   * - `limit`: 分页大小（默认 10）
+   * - `offset`: 分页偏移（默认 0）
    */
   async search(req: Bun.BunRequest<'/search'>): Promise<Response> {
     const queryInput = this.getSearchInput(req);
@@ -64,11 +98,13 @@ export class SearchController {
     }
 
     try {
-      const result = await this.kvMemoryService.searchMemory(
+      const result = await this.kvMemoryService.searchService.search(
         parsed.data.q,
         parsed.data.limit,
         parsed.data.offset,
         namespaceResult.namespace,
+        undefined,
+        parsed.data.sortLinks,
       );
 
       return Response.json({ success: true, data: result });
@@ -80,6 +116,14 @@ export class SearchController {
 
   /**
    * 处理多关键词全文搜索。
+   *
+   * Query 参数:
+   * - `keywords`: 逗号分隔关键词列表（必填）
+   * - `session`: 可选会话 ID，用于 namespace 隔离
+   * - `operator`: 关键词组合操作符 AND/OR（默认 OR）
+   * - `sortLinks`: 是否按综合得分排序 links（可选，默认 true）
+   * - `limit`: 分页大小（默认 10）
+   * - `offset`: 分页偏移（默认 0）
    */
   async fulltextSearch(req: Bun.BunRequest<'/fulltext'>): Promise<Response> {
     const queryInput = this.getFulltextInput(req);
@@ -107,12 +151,14 @@ export class SearchController {
     }
 
     try {
-      const result = await this.kvMemoryService.fulltextSearchMemory(
+      const result = await this.kvMemoryService.searchService.fulltextSearch(
         keywords,
         parsed.data.operator,
         parsed.data.limit,
         parsed.data.offset,
         namespaceResult.namespace,
+        undefined,
+        parsed.data.sortLinks,
       );
 
       return Response.json({ success: true, data: result });
@@ -130,6 +176,7 @@ export class SearchController {
     return {
       q: searchParams.get('q') ?? undefined,
       session: searchParams.get('session') ?? undefined,
+      sortLinks: searchParams.get('sortLinks') ?? undefined,
       limit: searchParams.get('limit') ?? undefined,
       offset: searchParams.get('offset') ?? undefined,
     };
@@ -144,6 +191,7 @@ export class SearchController {
       keywords: searchParams.get('keywords') ?? undefined,
       session: searchParams.get('session') ?? undefined,
       operator: searchParams.get('operator') ?? undefined,
+      sortLinks: searchParams.get('sortLinks') ?? undefined,
       limit: searchParams.get('limit') ?? undefined,
       offset: searchParams.get('offset') ?? undefined,
     };

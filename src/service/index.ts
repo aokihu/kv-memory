@@ -1,4 +1,10 @@
-export { KVMemoryService, type KVMemoryServiceDependencies } from "./kvmemory";
+export {
+  KVMemoryService,
+  type KVMemoryServiceDependencies,
+  type GetMemorySortLinks,
+  type SearchMemoryParams,
+  type FulltextSearchMemoryParams,
+} from "./kvmemory";
 export {
   SearchService,
   type SearchPagination,

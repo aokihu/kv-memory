@@ -3,7 +3,7 @@
 ## Purpose
 TBD - created by archiving change remove-memory-domain-type-fields.
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Memory API without domain and type
 The Memory API SHALL NOT accept or return domain and type fields. The Memory API SHALL support consistent link sorting behavior across all endpoints.

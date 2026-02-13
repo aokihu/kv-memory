@@ -8,18 +8,15 @@ import { encode } from "@toon-format/toon";
 import { type Tool } from "fastmcp";
 import { z } from "zod";
 import { KVMemoryService, SessionService } from "../../service";
+import { SearchParamsSchema, type SearchParamsInput } from "../schemas/search";
 
 type McpSessionAuth = Record<string, unknown> | undefined;
 
-const MemorySearchSchema = z.object({
-  query: z.string().trim().min(1).describe("Search query text"),
+const MemorySearchSchema = SearchParamsSchema.extend({
   session: z.string().min(1).describe("Required session ID for namespace filtering"),
-  limit: z.number().int().min(1).max(100).optional().default(10).describe("Page size (1-100)"),
-  offset: z.number().int().min(0).optional().default(0).describe("Pagination offset"),
-  output_format: z.enum(["json", "toon"]).optional().default("toon"),
 });
 
-type MemorySearchInput = z.infer<typeof MemorySearchSchema>;
+type MemorySearchInput = SearchParamsInput & { session: string };
 
 export const createMemorySearchTool = (
   sessionService: SessionService,
@@ -41,6 +38,7 @@ export const createMemorySearchTool = (
         args.limit,
         args.offset,
         namespace,
+        args.sortLinks,
       );
 
       const payload = { success: true, data: result };

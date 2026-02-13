@@ -11,8 +11,9 @@ import {
   appendMemoryStateFilter,
   type MemoryStateFilter,
   type QueryMemoryState,
+  sortLinksByCombinedScore,
 } from "../libs/kv/db/query";
-import type { Memory } from "../type";
+import type { Memory, MemoryLinkValue } from "../type";
 
 type SearchOperator = "AND" | "OR";
 
@@ -36,6 +37,7 @@ export type SearchResultItem = {
   excerpt: string;
   relevance: number;
   score: number;
+  links: MemoryLinkValue[];
 };
 
 export type SearchPagination = {
@@ -72,6 +74,7 @@ export class SearchService {
     offset = 0,
     namespace?: string,
     statusFilter?: SearchStateFilterInput,
+    sortLinks = true,
   ): Promise<SearchResult> {
     this.validateSearchQuery(query);
     const paging = this.normalizePagination(limit, offset);
@@ -81,7 +84,7 @@ export class SearchService {
     }
 
     const matchQuery = this.buildSearchQueryFromText(query);
-    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace, statusFilter);
+    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace, statusFilter, sortLinks);
   }
 
   /**
@@ -96,6 +99,7 @@ export class SearchService {
     offset = 0,
     namespace?: string,
     statusFilter?: SearchStateFilterInput,
+    sortLinks = true,
   ): Promise<SearchResult> {
     this.validateKeywords(keywords);
     this.validateOperator(operator);
@@ -106,7 +110,7 @@ export class SearchService {
     }
 
     const matchQuery = this.buildSearchQueryFromKeywords(keywords, operator);
-    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace, statusFilter);
+    return this.executeSearch(matchQuery, paging.limit, paging.offset, namespace, statusFilter, sortLinks);
   }
 
   /**
@@ -118,6 +122,7 @@ export class SearchService {
     offset: number,
     namespace?: string,
     statusFilter?: SearchStateFilterInput,
+    sortLinks = true,
   ): Promise<SearchResult> {
     try {
       const namespacePrefix = namespace?.trim() ? `${namespace.trim()}:` : null;
@@ -149,7 +154,7 @@ export class SearchService {
       const countClause = appendMemoryStateFilter(baseCountSql, baseParams, memoryStateFilter);
       const countRow = this.database.query(countClause.sql).get(...countClause.params) as SearchCountRow | null;
 
-      const results = await Promise.all(rows.map((row) => this.formatResultRow(row)));
+      const results = await Promise.all(rows.map((row) => this.formatResultRow(row, sortLinks)));
 
       return {
         results,
@@ -206,12 +211,14 @@ export class SearchService {
   /**
    * 格式化单条搜索结果。
    */
-  private async formatResultRow(row: SearchRow): Promise<SearchResultItem> {
+  private async formatResultRow(row: SearchRow, sortLinks: boolean): Promise<SearchResultItem> {
     const memory = (await this.kv.get(row.key)) as Memory | undefined;
+    const memoryLinks = await this.kv.getLinks(row.key);
     const summary = memory?.summary ?? row.summary;
     const sourceText = memory?.text ?? row.text;
     const excerpt = this.normalizeExcerpt(row.excerpt, sourceText);
     const relevance = this.toRelevance(row.rank ?? 0);
+    const links = sortLinks ? await this.sortResultLinks(memoryLinks) : memoryLinks;
 
     return {
       key: row.key,
@@ -219,7 +226,30 @@ export class SearchService {
       excerpt,
       relevance,
       score: relevance,
+      links,
     };
+  }
+
+  /**
+   * 对搜索结果中的 links 按综合得分排序。
+   *
+   * Debug hint: 若排序结果异常，优先检查 link.key 对应记忆是否存在以及 score 是否缺失回退。
+   */
+  private async sortResultLinks(links: MemoryLinkValue[]): Promise<MemoryLinkValue[]> {
+    if (links.length <= 1) {
+      return links;
+    }
+
+    const linkedKeys = [...new Set(links.map((link) => link.key).filter((key): key is string => Boolean(key)))];
+    const linkedMemories = await Promise.all(
+      linkedKeys.map(async (key) => {
+        const linkedMemory = await this.kv.get(key);
+        return [key, linkedMemory] as const;
+      }),
+    );
+
+    const linkedMemoriesByKey: Record<string, Memory | undefined> = Object.fromEntries(linkedMemories);
+    return sortLinksByCombinedScore(links, linkedMemoriesByKey);
   }
 
   /**

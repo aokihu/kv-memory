@@ -8,9 +8,34 @@ import { z } from 'zod'
 import { type AppServerContext } from "../type"
 
 /* 类型定义 */
+const SortLinksSchema = z.preprocess((value) => {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+
+        if (normalized === 'true') {
+            return true;
+        }
+
+        if (normalized === 'false') {
+            return false;
+        }
+    }
+
+    return value;
+}, z.boolean({ message: 'sortLinks must be true or false' }).optional().default(true));
+
 const RequestBodySchema = z.object({
     key: z.string(),
-    session: z.string()
+    session: z.string(),
+    sortLinks: SortLinksSchema
 })
 
 type RequestBody = z.infer<typeof RequestBodySchema>
@@ -33,7 +58,12 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
         return Response.json({ success: false, message: result.error.issues }, { status: 400 });
     }
 
-    const { key, session } = result.data;
+    const { key, session, sortLinks } = result.data;
+
+    const kvMemoryService = ctx.kvMemoryService as unknown as {
+        traverseMemory: (namespace: string, key: string) => Promise<unknown>,
+        getMemory: (namespace: string, key: string, sortLinks?: boolean) => Promise<unknown>
+    }
 
     // 验证session
     const sessionData = await ctx.sessionService.getSession(session);
@@ -50,11 +80,11 @@ export const getMemoryController = async (req: Bun.BunRequest<"/get_memory">, ct
 
     if (lastMemoryKey !== '') {
         // 更新上一次访问的记忆连接记录
-        await ctx.kvMemoryService.traverseMemory(ns, lastMemoryKey);
+        await kvMemoryService.traverseMemory(ns, lastMemoryKey);
     }
 
     // 从KVDB中获取内存
-    const memory = await ctx.kvMemoryService.getMemory(ns, key);
+    const memory = await kvMemoryService.getMemory(ns, key, sortLinks);
     if (!memory) {
         return Response.json({
             success: false,

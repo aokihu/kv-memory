@@ -207,9 +207,64 @@ curl -X GET "http://localhost:3000/api/memories/stats?exportFormat=json"
 - 健康巡检固定调用 `/api/health/memory-system`，关注 `status` 与 `scheduler` 关键字段
 - 客户端迁移时彻底移除 `domain`/`type` 字段，防止 400 校验错误
 
+## MCP工具与HTTP API一致性
+
+系统提供MCP（Model Context Protocol）工具，与HTTP API保持行为一致性。MCP工具支持相同的参数和排序逻辑。
+
+### 链接排序参数（sortLinks）
+
+所有记忆获取和搜索接口都支持 `sortLinks` 参数，用于控制返回的记忆链接数组是否按综合得分排序。
+
+#### 参数说明
+| 参数 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `sortLinks` | `boolean` 或 `string` | `true` | 控制links数组是否按 `link weight × memory score` 排序 |
+
+#### 支持的值
+- `true` 或 `"true"`：启用链接排序（默认）
+- `false` 或 `"false"`：禁用链接排序，保持原始顺序
+- 其他值：返回参数验证错误
+
+#### 排序算法
+链接按综合得分从高到低排序：
+1. 综合得分 = `link weight × memory score`
+2. 平局处理：综合得分相同 → link weight降序 → memory key字母顺序
+3. 缺失score时使用默认值50
+
+#### HTTP API使用示例
+```bash
+# 获取记忆并排序links
+curl -X POST "http://localhost:3000/get_memory" \
+  -H "Content-Type: application/json" \
+  -d '{"key": "project:design", "sortLinks": true}'
+
+# 搜索并禁用links排序
+curl -X GET "http://localhost:3000/search?q=quantum&sortLinks=false"
+```
+
+#### MCP工具使用示例
+```json
+{
+  "tool": "memory_get",
+  "arguments": {
+    "key": "project:design",
+    "sortLinks": true,
+    "output_format": "json"
+  }
+}
+```
+
+### 行为一致性保证
+- HTTP API和MCP工具使用相同的排序算法
+- 默认行为一致：不指定 `sortLinks` 时都启用排序
+- 参数验证一致：支持相同的值类型和错误处理
+- 排序结果一致：相同输入产生相同的links顺序
+
 ## 相关文档链接
 
 - 记忆衰退算法说明：`docs/MEMORY_ALGORITHM.md`
 - 客户端迁移指南（移除 domain/type）：`docs/CLIENT_MIGRATION_GUIDE_DOMAIN_TYPE_REMOVAL.md`
+- MCP工具使用指南：`MCP-README.md`
 - OpenSpec 变更（memory-api）：`openspec/changes/implement-memory-decay-algorithm/specs/memory-api/spec.md`
 - OpenSpec 变更（memory-decay-algorithm）：`openspec/changes/implement-memory-decay-algorithm/specs/memory-decay-algorithm/spec.md`
+- OpenSpec 变更（MCP链接排序）：`openspec/changes/add-sortlinks-to-mcp-tools/`

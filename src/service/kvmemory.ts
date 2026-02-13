@@ -4,6 +4,7 @@
  * @license MIT
  */
 import { KVMemory } from "../libs/kv";
+import { sortLinksByCombinedScore } from "../libs/kv/db/query";
 import { SearchService, type SearchResult } from "./searchService";
 import {
   type MemoryLinkValue,
@@ -23,6 +24,27 @@ export type MemoryNoMetaWithLinkSummary = Omit<Memory, "meta"> & {
 export type KVMemoryServiceDependencies = {
   kv?: KVMemory;
   searchService?: SearchService;
+};
+
+export type GetMemorySortLinks = {
+  sortLinks?: boolean;
+};
+
+export type SearchMemoryParams = {
+  query: string;
+  limit?: number;
+  offset?: number;
+  namespace?: string;
+  sortLinks?: boolean;
+};
+
+export type FulltextSearchMemoryParams = {
+  keywords: string[];
+  operator?: "AND" | "OR";
+  limit?: number;
+  offset?: number;
+  namespace?: string;
+  sortLinks?: boolean;
 };
 
 export class KVMemoryService {
@@ -55,9 +77,16 @@ export class KVMemoryService {
    * @returns 记忆的value
    * @description 增加访问次数和最后访问时间
    */
+  async getMemory(key: string, sortLinks?: boolean): Promise<MemoryNoMetaWithLinkSummary | undefined>;
+  async getMemory(namespace: string, key: string, sortLinks?: boolean): Promise<MemoryNoMetaWithLinkSummary | undefined>;
   async getMemory(
-    key: string,
+    keyOrNamespace: string,
+    keyOrSortLinks: string | boolean = true,
+    maybeSortLinks = true,
   ): Promise<MemoryNoMetaWithLinkSummary | undefined> {
+    const key = typeof keyOrSortLinks === "string" ? keyOrSortLinks : keyOrNamespace;
+    const sortLinks = typeof keyOrSortLinks === "boolean" ? keyOrSortLinks : maybeSortLinks;
+
     const value = await this.kv.get(key);
     if (!value) return undefined;
 
@@ -80,23 +109,34 @@ export class KVMemoryService {
     }
 
     try {
-      const links = await Promise.all(
-        memoryLinks.map(async (link) => {
-          const linkedValue = await this.kv.get(link.key! as string);
-          if (!linkedValue) {
-            return {
-              ...link,
-              summary: "关联记忆不存在",
-            };
-          }
-
-          const linkedMemory = linkedValue as Memory;
-          return {
-            ...link,
-            summary: linkedMemory.summary ?? "关联记忆不存在",
-          };
+      const linkedKeys = [...new Set(memoryLinks.map((link) => link.key).filter((value): value is string => Boolean(value)))];
+      const linkedMemories = await Promise.all(
+        linkedKeys.map(async (linkedKey) => {
+          const linkedValue = await this.kv.get(linkedKey);
+          return [linkedKey, linkedValue as Memory | undefined] as const;
         }),
       );
+
+      const linkedMemoriesByKey: Record<string, Memory | undefined> = Object.fromEntries(linkedMemories);
+      const sortedLinks = sortLinks
+        ? sortLinksByCombinedScore(memoryLinks, linkedMemoriesByKey)
+        : memoryLinks;
+
+      const links = sortedLinks.map((link) => {
+        const linkedMemory = link.key ? linkedMemoriesByKey[link.key] : undefined;
+
+        if (!linkedMemory) {
+          return {
+            ...link,
+            summary: "关联记忆不存在",
+          };
+        }
+
+        return {
+          ...link,
+          summary: linkedMemory.summary ?? "关联记忆不存在",
+        };
+      });
 
       return {
         ...baseMemory,
@@ -140,8 +180,14 @@ export class KVMemoryService {
    * 代理基础关键词搜索。
    * Debug hint: 若返回空结果，先检查 SearchService 内部 `searchEnabled` 配置。
    */
-  async searchMemory(query: string, limit = 10, offset = 0, namespace?: string): Promise<SearchResult> {
-    return this.searchService.search(query, limit, offset, namespace);
+  async searchMemory(
+    query: string,
+    limit = 10,
+    offset = 0,
+    namespace?: string,
+    sortLinks = true,
+  ): Promise<SearchResult> {
+    return this.searchService.search(query, limit, offset, namespace, undefined, sortLinks);
   }
 
   /**
@@ -154,8 +200,17 @@ export class KVMemoryService {
     limit = 10,
     offset = 0,
     namespace?: string,
+    sortLinks = true,
   ): Promise<SearchResult> {
-    return this.searchService.fulltextSearch(keywords, operator, limit, offset, namespace);
+    return this.searchService.fulltextSearch(
+      keywords,
+      operator,
+      limit,
+      offset,
+      namespace,
+      undefined,
+      sortLinks,
+    );
   }
 
   /**

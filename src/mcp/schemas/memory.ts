@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MemoryLink, MemoryNoMetaSchema } from "../../type";
+import { SortLinksSchema } from "./common";
 
 export const MemoryLinkInputSchema = MemoryLink.extend({
   key: z.string().optional(),
@@ -18,6 +19,7 @@ export const MemoryAddSchema = z.object({
 export const MemoryGetSchema = z.object({
   key: z.string().min(1),
   session: z.string().min(1).optional(),
+  sortLinks: SortLinksSchema,
   output_format: z.enum(["json", "toon"]).default("toon"),
 });
 

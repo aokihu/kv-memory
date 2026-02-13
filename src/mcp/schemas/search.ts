@@ -6,6 +6,8 @@
  */
 
 import { z } from "zod";
+import { MemoryLink } from "../../type";
+import { SortLinksSchema } from "./common";
 
 /**
  * 基础关键词搜索参数。
@@ -17,6 +19,7 @@ export const SearchParamsSchema = z.object({
   query: z.string().trim().min(1).describe("Search query text"),
   limit: z.number().int().min(1).max(100).optional().default(10).describe("Page size (1-100)"),
   offset: z.number().int().min(0).optional().default(0).describe("Pagination offset"),
+  sortLinks: SortLinksSchema,
   output_format: z.enum(["json", "toon"]).optional().default("toon"),
 });
 
@@ -36,6 +39,7 @@ export const FulltextSearchParamsSchema = z.object({
   operator: z.enum(["AND", "OR"]).optional().default("OR").describe("Keyword operator"),
   limit: z.number().int().min(1).max(100).optional().default(10).describe("Page size (1-100)"),
   offset: z.number().int().min(0).optional().default(0).describe("Pagination offset"),
+  sortLinks: SortLinksSchema,
   output_format: z.enum(["json", "toon"]).optional().default("toon"),
 });
 
@@ -55,6 +59,7 @@ export const SearchResultSchema = z.object({
   excerpt: z.string().describe("Highlighted excerpt or text snippet"),
   relevance: z.number().min(0).max(1).describe("Relevance score normalized to 0..1"),
   score: z.number().min(0).max(1).describe("Compatibility score field, same value as relevance"),
+  links: z.array(MemoryLink).describe("Memory links for this result"),
 });
 
 /**

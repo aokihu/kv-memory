@@ -121,9 +121,16 @@
   {
     "key": "decision/42",
     "session": "<可选的 session key>",
+    "sortLinks": true,  // 可选，控制links数组是否排序，默认 true
     "output_format": "toon"  // 可选，默认 toon，可设置为 json
   }
   ```
+
+- **参数说明**：
+  - `key`：记忆的唯一标识符，必填
+  - `session`：可选的会话ID，用于上下文追踪
+  - `sortLinks`：控制返回的links数组是否按综合得分排序，可选，支持boolean类型或字符串"true"/"false"，默认 `true`
+  - `output_format`：输出格式，可选 `toon` 或 `json`，默认 `toon`
 
 - **行为**：
   1. 如果传入 `session` 或 STDIO 缓存里有，会尝试加载已有会话并跑一次 `traverseMemory(last_memory_key)`，保持路径一致。
@@ -186,6 +193,7 @@
   {
     "query": "量子计算",
     "session": "session_key_here",
+    "sortLinks": true,  // 可选，控制links数组是否排序，默认 true
     "limit": 20,
     "offset": 0,
     "highlight": true,
@@ -196,6 +204,7 @@
 - **参数说明**：
   - `query`：搜索关键词，必填
   - `session`：可选的会话ID，用于namespace过滤。提供有效session时，只返回该session对应namespace下的记忆
+  - `sortLinks`：控制返回的links数组是否按综合得分排序，可选，支持boolean类型或字符串"true"/"false"，默认 `true`
   - `limit`：返回结果数量限制，可选，默认 20，最大 100
   - `offset`：结果偏移量，用于分页，可选，默认 0
   - `highlight`：是否在结果中高亮关键词，可选，默认 true
@@ -244,6 +253,7 @@
   {
     "keywords": "量子,计算,比特",
     "session": "session_key_here",
+    "sortLinks": true,  // 可选，控制links数组是否排序，默认 true
     "operator": "OR",
     "limit": 20,
     "offset": 0,
@@ -255,6 +265,7 @@
 - **参数说明**：
   - `keywords`：逗号分隔的关键词列表，必填
   - `session`：可选的会话ID，用于namespace过滤。提供有效session时，只返回该session对应namespace下的记忆
+  - `sortLinks`：控制返回的links数组是否按综合得分排序，可选，支持boolean类型或字符串"true"/"false"，默认 `true`
   - `operator`：逻辑运算符，可选 `AND`（所有关键词必须匹配）或 `OR`（任一关键词匹配），默认 `OR`
   - `limit`：返回结果数量限制，可选，默认 20，最大 100
   - `offset`：结果偏移量，用于分页，可选，默认 0
@@ -398,6 +409,7 @@ links[0]:
   "tool": "memory_get",
   "arguments": {
     "key": "decision/42",
+    "sortLinks": true,
     "output_format": "json"
   }
 }
@@ -412,6 +424,7 @@ links[0]:
   "tool": "memory_search",
   "arguments": {
     "query": "量子计算",
+    "sortLinks": true,
     "limit": 10,
     "offset": 0,
     "highlight": true,
@@ -427,6 +440,7 @@ links[0]:
   "tool": "memory_fulltext_search",
   "arguments": {
     "keywords": "量子,计算,比特",
+    "sortLinks": true,
     "operator": "OR",
     "limit": 5,
     "output_format": "json"

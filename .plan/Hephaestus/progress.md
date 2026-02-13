@@ -1,9 +1,35 @@
 # Progress Log
 
-## 2026-02-12
-- 初始化 `planning-with-files` 规划文件。
-- 记录阻塞：技能文档提到的 `session-catchup.py` 在本地不存在，已采用手动流程继续。
-- 已完成步骤1：审阅 `tests/mcp.search-tools.test.ts`，定位所有缺失 `session` 的测试调用与描述。
-- 已完成步骤2/3：更新目标测试文件，移除无 session 行为用例，新增 fulltext 无效 session 错误用例。
-- 已完成步骤4：执行 `bun test tests/mcp.search-tools.test.ts`，结果 9/9 通过。
-- 已完成步骤5：整理并确认任务验收项全部满足。
+## 2026-02-13
+- Initialized planning files in `.plan/Hephaestus/`.
+- Logged initial blocker for missing `${CLAUDE_PLUGIN_ROOT}` session-catchup script path.
+- Next: inspect reference and target controller files, then implement one-file fix.
+- Read `src/controller/searchController.ts`, `src/controller/getMemory.ts`, and related OpenSpec docs.
+- Updated `src/controller/getMemory.ts` to introduce `SortLinksSchema` with preprocess normalization and default `true`.
+- Added explicit sortLinks validation message: `sortLinks must be true or false`.
+- Ran `bunx tsc --noEmit`; command fails due to unrelated existing errors in other controller files.
+- Switched to new task: implement MCP `sortLinks` support for change `add-sortlinks-to-mcp-tools`.
+- Read target MCP schema/tool files and OpenSpec docs for mcp-link-sorting/mcp-integration/mcp-search-tools.
+- Confirmed service-layer sort support exists in `searchService.ts`; planned sequential updates starting from shared schema file.
+- Created `src/mcp/schemas/common.ts` with reusable `SortLinksSchema` (boolean + string `true/false`, default `true`, explicit validation message).
+- Updated `src/mcp/schemas/memory.ts` to add `sortLinks` in `MemoryGetSchema` via shared `SortLinksSchema`.
+- Updated `src/mcp/schemas/search.ts` to add `sortLinks` in both `SearchParamsSchema` and `FulltextSearchParamsSchema` via shared `SortLinksSchema`.
+- Updated `src/service/kvmemory.ts`:
+- `getMemory(key, sortLinks = true)` now supports optional link sorting via `sortLinksByCombinedScore`.
+- `searchMemory(..., sortLinks = true)` now forwards flag to `searchService.search`.
+- `fulltextSearchMemory(..., sortLinks = true)` now forwards flag to `searchService.fulltextSearch`.
+- Updated MCP tools:
+- `src/mcp/tools/memoryGet.ts` now passes `args.sortLinks` into `kvMemoryService.getMemory`.
+- `src/mcp/tools/memorySearch.ts` now reuses `SearchParamsSchema` (extended with required `session`) and passes `args.sortLinks` into `searchMemory`.
+- `src/mcp/tools/memoryFulltextSearch.ts` now reuses `FulltextSearchParamsSchema` (extended with required `session`) and passes `args.sortLinks` into `fulltextSearchMemory`.
+- Added `KVMemoryService.getMemory` overload to preserve old call style `(namespace, key, sortLinks?)` while supporting new `(key, sortLinks?)`.
+- Ran `bunx tsc --noEmit`; current failures are pre-existing controller/service signature mismatches in add/update/updateKey paths, unrelated to MCP sortLinks flow.
+- Updated `tests/mcp.search-tools.test.ts` to add sortLinks coverage for `memory_get`, `memory_search`, and `memory_fulltext_search`.
+- Added helper seed/parse utilities for deterministic link-order assertions and expanded cleanup patterns for namespace-prefixed test keys.
+- Added cases: default sort, boolean true/false, string "true"/"false", and invalid value rejection for all three MCP tools.
+- Ran `bun test tests/mcp.search-tools.test.ts`; blocked by existing SQLite initialization error `SQLITE_IOERR_SHORT_READ` before test execution.
+- Updated `src/type.ts` with shared sortLinks and MCP tool type definitions (`SortLinksInput`, MCP params/response types).
+- Updated `src/mcp/schemas/common.ts` exported type aliases to distinguish input/output (`z.input`/`z.output`).
+- Updated `src/mcp/schemas/search.ts` result schema to include `links` field matching runtime search payload.
+- Updated `src/service/kvmemory.ts`/`src/service/index.ts` exports for service-layer sortLinks-related interface types.
+- Ran `bunx tsc --noEmit`; no new type errors introduced by these changes (remaining errors are pre-existing controller argument mismatches).

@@ -109,9 +109,67 @@ async function seedNamespaceRecords(
   return { keyA, keyB };
 }
 
+async function seedLinkedMemoryForSortTests(
+  kvMemoryService: KVMemoryService,
+  namespace: string,
+  searchToken: string,
+): Promise<{ sourceKey: string; lowWeightKey: string; highWeightKey: string }> {
+  const lowWeightKey = `${namespace}:${testKeyPrefix}${Date.now()}_link_low`;
+  const highWeightKey = `${namespace}:${testKeyPrefix}${Date.now()}_link_high`;
+  const sourceKey = `${namespace}:${testKeyPrefix}${Date.now()}_source`;
+
+  await kvMemoryService.addMemory(lowWeightKey, {
+    summary: "low weight linked memory",
+    text: "linked memory low",
+  });
+
+  await kvMemoryService.addMemory(highWeightKey, {
+    summary: "high weight linked memory",
+    text: "linked memory high",
+  });
+
+  await kvMemoryService.addMemory(
+    sourceKey,
+    {
+      summary: "source memory for sortLinks",
+      text: `source body contains ${searchToken}`,
+    },
+    [
+      { type: "design", key: lowWeightKey, term: "low", weight: 0.1 },
+      { type: "decision", key: highWeightKey, term: "high", weight: 0.9 },
+    ],
+  );
+
+  return { sourceKey, lowWeightKey, highWeightKey };
+}
+
+function getResultLinksFromSearchPayload(payload: Record<string, unknown>, sourceKey: string): string[] {
+  const data = payload.data as {
+    results: Array<{ key: string; links?: Array<{ key?: string }> }>;
+  };
+  const target = data.results.find((item) => item.key === sourceKey);
+  if (!target?.links) {
+    return [];
+  }
+
+  return target.links.map((link) => link.key ?? "");
+}
+
+function getResultLinksFromMemoryGetPayload(payload: Record<string, unknown>): string[] {
+  const data = payload.data as {
+    links?: Array<{ key?: string }>;
+  };
+
+  return (data.links ?? []).map((link) => link.key ?? "");
+}
+
 function cleanupTestRows(): void {
-  database.query("DELETE FROM memory_links WHERE from_key LIKE ? OR to_key LIKE ?").run(`${testKeyPrefix}%`, `${testKeyPrefix}%`);
-  database.query("DELETE FROM memories WHERE key LIKE ?").run(`${testKeyPrefix}%`);
+  database
+    .query("DELETE FROM memory_links WHERE from_key LIKE ? OR to_key LIKE ? OR from_key LIKE ? OR to_key LIKE ?")
+    .run(`${testKeyPrefix}%`, `${testKeyPrefix}%`, `%:${testKeyPrefix}%`, `%:${testKeyPrefix}%`);
+  database
+    .query("DELETE FROM memories WHERE key LIKE ? OR key LIKE ?")
+    .run(`${testKeyPrefix}%`, `%:${testKeyPrefix}%`);
 }
 
 afterEach(() => {
@@ -119,7 +177,8 @@ afterEach(() => {
 });
 
 describe("MCP search tools", () => {
-  test("registers memory_search and memory_fulltext_search tools", () => {
+  test("registers memory_get, memory_search and memory_fulltext_search tools", () => {
+    expect(() => resolveTool("memory_get")).not.toThrow();
     expect(() => resolveTool("memory_search")).not.toThrow();
     expect(() => resolveTool("memory_fulltext_search")).not.toThrow();
   });
@@ -329,6 +388,226 @@ describe("MCP search tools", () => {
     const payload = parseJsonPayload(emptyKeywordExecutionResult);
     expect(payload.success).toBe(false);
     expect(payload.message).toBe("keywords must contain at least one non-empty value");
+  });
+
+  test("memory_get applies sortLinks default, boolean and string values", async () => {
+    const kvMemoryService = new KVMemoryService();
+    const namespace = `${testKeyPrefix}${Date.now()}_get_sort_ns`;
+    const token = `${testKeyPrefix}${Date.now()}_get_sort_token`;
+    const { sourceKey, lowWeightKey, highWeightKey } = await seedLinkedMemoryForSortTests(
+      kvMemoryService,
+      namespace,
+      token,
+    );
+
+    const defaultResult = await callRegisteredTool("memory_get", {
+      key: sourceKey,
+      output_format: "json",
+    });
+    const defaultPayload = parseJsonPayload(defaultResult);
+    expect(defaultPayload.success).toBe(true);
+    expect(getResultLinksFromMemoryGetPayload(defaultPayload)).toEqual([highWeightKey, lowWeightKey]);
+
+    const trueResult = await callRegisteredTool("memory_get", {
+      key: sourceKey,
+      sortLinks: true,
+      output_format: "json",
+    });
+    const truePayload = parseJsonPayload(trueResult);
+    expect(truePayload.success).toBe(true);
+    expect(getResultLinksFromMemoryGetPayload(truePayload)).toEqual([highWeightKey, lowWeightKey]);
+
+    const falseResult = await callRegisteredTool("memory_get", {
+      key: sourceKey,
+      sortLinks: false,
+      output_format: "json",
+    });
+    const falsePayload = parseJsonPayload(falseResult);
+    expect(falsePayload.success).toBe(true);
+    expect(getResultLinksFromMemoryGetPayload(falsePayload)).toEqual([lowWeightKey, highWeightKey]);
+
+    const stringTrueResult = await callRegisteredTool("memory_get", {
+      key: sourceKey,
+      sortLinks: "true",
+      output_format: "json",
+    });
+    const stringTruePayload = parseJsonPayload(stringTrueResult);
+    expect(stringTruePayload.success).toBe(true);
+    expect(getResultLinksFromMemoryGetPayload(stringTruePayload)).toEqual([highWeightKey, lowWeightKey]);
+
+    const stringFalseResult = await callRegisteredTool("memory_get", {
+      key: sourceKey,
+      sortLinks: "false",
+      output_format: "json",
+    });
+    const stringFalsePayload = parseJsonPayload(stringFalseResult);
+    expect(stringFalsePayload.success).toBe(true);
+    expect(getResultLinksFromMemoryGetPayload(stringFalsePayload)).toEqual([lowWeightKey, highWeightKey]);
+  });
+
+  test("memory_get rejects invalid sortLinks value", async () => {
+    const result = await callRegisteredTool("memory_get", {
+      key: `${testKeyPrefix}${Date.now()}_invalid_get_key`,
+      sortLinks: "yes",
+      output_format: "json",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("sortLinks must be true or false");
+  });
+
+  test("memory_search applies sortLinks default, boolean and string values", async () => {
+    const kvMemoryService = new KVMemoryService();
+    const namespace = `${testKeyPrefix}${Date.now()}_search_sort_ns`;
+    const session = await createServerSession(namespace);
+    const token = `${testKeyPrefix}${Date.now()}_search_sort_token`;
+    const { sourceKey, lowWeightKey, highWeightKey } = await seedLinkedMemoryForSortTests(
+      kvMemoryService,
+      namespace,
+      token,
+    );
+
+    const defaultResult = await callRegisteredTool("memory_search", {
+      query: token,
+      session,
+      output_format: "json",
+    });
+    const defaultPayload = parseJsonPayload(defaultResult);
+    expect(defaultPayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(defaultPayload, sourceKey)).toEqual([highWeightKey, lowWeightKey]);
+
+    const trueResult = await callRegisteredTool("memory_search", {
+      query: token,
+      session,
+      sortLinks: true,
+      output_format: "json",
+    });
+    const truePayload = parseJsonPayload(trueResult);
+    expect(truePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(truePayload, sourceKey)).toEqual([highWeightKey, lowWeightKey]);
+
+    const falseResult = await callRegisteredTool("memory_search", {
+      query: token,
+      session,
+      sortLinks: false,
+      output_format: "json",
+    });
+    const falsePayload = parseJsonPayload(falseResult);
+    expect(falsePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(falsePayload, sourceKey)).toEqual([lowWeightKey, highWeightKey]);
+
+    const stringTrueResult = await callRegisteredTool("memory_search", {
+      query: token,
+      session,
+      sortLinks: "true",
+      output_format: "json",
+    });
+    const stringTruePayload = parseJsonPayload(stringTrueResult);
+    expect(stringTruePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(stringTruePayload, sourceKey)).toEqual([highWeightKey, lowWeightKey]);
+
+    const stringFalseResult = await callRegisteredTool("memory_search", {
+      query: token,
+      session,
+      sortLinks: "false",
+      output_format: "json",
+    });
+    const stringFalsePayload = parseJsonPayload(stringFalseResult);
+    expect(stringFalsePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(stringFalsePayload, sourceKey)).toEqual([lowWeightKey, highWeightKey]);
+  });
+
+  test("memory_search rejects invalid sortLinks value", async () => {
+    const session = await createServerSession(`${testKeyPrefix}${Date.now()}_invalid_search_sort_ns`);
+    const result = await callRegisteredTool("memory_search", {
+      query: "token",
+      session,
+      sortLinks: "yes",
+      output_format: "json",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("sortLinks must be true or false");
+  });
+
+  test("memory_fulltext_search applies sortLinks default, boolean and string values", async () => {
+    const kvMemoryService = new KVMemoryService();
+    const namespace = `${testKeyPrefix}${Date.now()}_fulltext_sort_ns`;
+    const session = await createServerSession(namespace);
+    const token = `${testKeyPrefix}${Date.now()}_fulltext_sort_token`;
+    const { sourceKey, lowWeightKey, highWeightKey } = await seedLinkedMemoryForSortTests(
+      kvMemoryService,
+      namespace,
+      token,
+    );
+
+    const defaultResult = await callRegisteredTool("memory_fulltext_search", {
+      keywords: token,
+      session,
+      operator: "OR",
+      output_format: "json",
+    });
+    const defaultPayload = parseJsonPayload(defaultResult);
+    expect(defaultPayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(defaultPayload, sourceKey)).toEqual([highWeightKey, lowWeightKey]);
+
+    const trueResult = await callRegisteredTool("memory_fulltext_search", {
+      keywords: token,
+      session,
+      operator: "OR",
+      sortLinks: true,
+      output_format: "json",
+    });
+    const truePayload = parseJsonPayload(trueResult);
+    expect(truePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(truePayload, sourceKey)).toEqual([highWeightKey, lowWeightKey]);
+
+    const falseResult = await callRegisteredTool("memory_fulltext_search", {
+      keywords: token,
+      session,
+      operator: "OR",
+      sortLinks: false,
+      output_format: "json",
+    });
+    const falsePayload = parseJsonPayload(falseResult);
+    expect(falsePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(falsePayload, sourceKey)).toEqual([lowWeightKey, highWeightKey]);
+
+    const stringTrueResult = await callRegisteredTool("memory_fulltext_search", {
+      keywords: token,
+      session,
+      operator: "OR",
+      sortLinks: "true",
+      output_format: "json",
+    });
+    const stringTruePayload = parseJsonPayload(stringTrueResult);
+    expect(stringTruePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(stringTruePayload, sourceKey)).toEqual([highWeightKey, lowWeightKey]);
+
+    const stringFalseResult = await callRegisteredTool("memory_fulltext_search", {
+      keywords: token,
+      session,
+      operator: "OR",
+      sortLinks: "false",
+      output_format: "json",
+    });
+    const stringFalsePayload = parseJsonPayload(stringFalseResult);
+    expect(stringFalsePayload.success).toBe(true);
+    expect(getResultLinksFromSearchPayload(stringFalsePayload, sourceKey)).toEqual([lowWeightKey, highWeightKey]);
+  });
+
+  test("memory_fulltext_search rejects invalid sortLinks value", async () => {
+    const session = await createServerSession(`${testKeyPrefix}${Date.now()}_invalid_fulltext_sort_ns`);
+    const result = await callRegisteredTool("memory_fulltext_search", {
+      keywords: "token",
+      session,
+      operator: "OR",
+      sortLinks: "yes",
+      output_format: "json",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain("sortLinks must be true or false");
   });
 
   test("supports toon output for memory_search and memory_fulltext_search with required session", async () => {

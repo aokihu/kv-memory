@@ -1,5 +1,7 @@
 # kvdb-mem
 
+![GitHub Actions](https://github.com/aokihu/kv-memory/actions/workflows/release.yml/badge.svg)
+
 To install dependencies:
 
 ```bash

@@ -27,10 +27,20 @@
     "deploy:verify": "bunx tsc --noEmit && bun test tests/kv.sqlite.test.ts tests/db.schema.test.ts tests/db.migrate.test.ts tests/api-compatibility.test.ts tests/concurrent-access.test.ts tests/final-verification.test.ts",
     "script:backup": "bun run ./scripts/backup-kv-db.ts",
     "script:repair": "bun run ./scripts/repair-fts5-index.ts",
-    "script:check": "bun run ./scripts/test-startup-fts5-integrity.ts"
+    "script:check": "bun run ./scripts/test-startup-fts5-integrity.ts",
+    "commitlint": "commitlint --from HEAD~1 --to HEAD"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/npm": "^13.1.4",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "@types/bun": "latest",
+    "semantic-release": "^25.0.3"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"

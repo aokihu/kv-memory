@@ -1,23 +1,26 @@
-# kvdb-mem 自动发布流程
+# kvdb-mem 安装和使用指南
 
-本文档说明本项目如何通过 GitHub Actions + semantic-release 执行自动化发布。
+本文档说明如何安装和使用 kvdb-mem 项目。
 
-## 1. 提交规范（Conventional Commits）
+## 1. 安装方法
 
-本仓库使用 `@commitlint/config-conventional` 校验提交信息。发布版本由提交类型自动计算：
+### 从源码安装
+```bash
+# 克隆仓库
+git clone https://github.com/aokihu/kv-memory.git
+cd kv-memory
 
-- `feat:` -> 触发 `minor` 版本
-- `fix:` -> 触发 `patch` 版本
-- `feat!:` 或包含 `BREAKING CHANGE:` -> 触发 `major` 版本
-- `chore/docs/test/refactor` 等类型通常不会触发发布
+# 安装依赖
+bun install
 
-示例：
-
-```text
-feat(memory): add link traversal cache for bulk read
-fix(kv): handle sqlite busy retry on write path
-feat(api)!: remove deprecated memory score field
+# 构建项目
+bun run build
 ```
+
+### 作为依赖使用
+由于项目是私有包，无法从 npm 安装。你可以：
+1. 将仓库添加为 git submodule
+2. 或直接复制源码到你的项目中
 
 本地可手动校验最近一次提交：
 

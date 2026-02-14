@@ -1,7 +1,7 @@
 ## 1. 环境准备和配置
 
 - [x] 1.1 创建 GitHub Actions 工作流目录结构
-- [ ] 1.2 配置 GitHub Secrets (NPM_TOKEN, GH_TOKEN)
+- [x] 1.2 配置 GitHub Secrets (GH_TOKEN) - 已完成配置
 - [x] 1.3 安装 semantic-release 及相关依赖
 - [x] 1.4 配置 conventional commits 验证工具
 

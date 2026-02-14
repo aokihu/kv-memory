@@ -72,3 +72,43 @@ bun run bench
 bun run bench:kv
 bun run bench:links
 ```
+
+## 📦 Releases
+
+### v2.0.0 - Major Timing System Refactor
+- **All `setInterval` usage replaced with recursive `setTimeout`** for better timing control
+- Fixed `Infinity` timeout parameter handling in decay processor
+- Enhanced error handling and system stability
+- Added standalone CLI tools for database maintenance
+
+### Download Binary
+```bash
+# Download v2.0.0 binary
+curl -L -o kvdb-mem https://github.com/aokihu/kv-memory/releases/download/v2.0.0/kvdb-mem
+
+# Make executable
+chmod +x kvdb-mem
+
+# Verify checksum
+echo "CHECKSUM_HERE  kvdb-mem" | sha256sum -c
+
+# Move to PATH
+sudo mv kvdb-mem /usr/local/bin/
+```
+
+### CLI Usage
+```bash
+# Show help
+kvdb-mem --help
+
+# Backup database
+kvdb-mem backup
+
+# Repair FTS5 index
+kvdb-mem repair
+
+# Check database integrity
+kvdb-mem check
+```
+
+For detailed changelog, see [CHANGELOG.md](CHANGELOG.md)

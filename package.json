@@ -2,7 +2,7 @@
   "name": "kvdb-mem",
   "module": "index.ts",
   "type": "module",
-  "version": "1.8.0",
+  "version": "2.0.0",
   "private": true,
   "bin": {
     "kvdb-mem": "./dist/kvdb-mem"

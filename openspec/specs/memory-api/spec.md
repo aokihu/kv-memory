@@ -2,32 +2,27 @@
 
 ## Purpose
 TBD - created by archiving change remove-memory-domain-type-fields.
-
 ## Requirements
-
 ### Requirement: Memory API without domain and type
-The Memory API SHALL NOT accept or return domain and type fields. The Memory API SHALL support consistent link sorting behavior across all endpoints.
+The Memory API SHALL NOT accept or return domain and type fields.
 
 #### Scenario: Create memory API
 - **WHEN** client calls memory creation API
 - **THEN** the request body must not contain domain or type fields
 - **AND** successful response does not contain domain or type fields
+- **AND** the created memory has initial score of 50 in meta field
 
 #### Scenario: Get memory API
 - **WHEN** client calls memory retrieval API
 - **THEN** the response does not contain domain or type fields
 - **AND** all other fields are present
-- **AND** response supports optional `sortLinks` query parameter for controlling link sorting
+- **AND** includes the memory's score in meta field if available
 
 #### Scenario: Update memory API
 - **WHEN** client calls memory update API
 - **THEN** the request body must not contain domain or type fields
 - **AND** successful response does not contain domain or type fields
-
-#### Scenario: Search memory API
-- **WHEN** client calls memory search API
-- **THEN** response includes search results with memory data
-- **AND** response supports optional `sortLinks` query parameter for controlling link sorting in results
+- **AND** the memory's score is preserved unless explicitly updated by decay algorithm
 
 ### Requirement: API error handling for removed fields
 The API SHALL return appropriate error responses when clients attempt to use removed fields.
@@ -43,32 +38,54 @@ The API SHALL return appropriate error responses when clients attempt to use rem
 - **AND** error message: "type field has been removed. Please update your client."
 
 ### Requirement: API versioning and compatibility
-The API SHALL provide clear versioning information for breaking changes. The API SHALL ensure consistent behavior between HTTP API and MCP tools for link sorting.
+The API SHALL provide clear versioning information for breaking changes.
 
 #### Scenario: API version header
 - **WHEN** client makes API request
 - **THEN** response includes X-API-Version header
 - **AND** version indicates removal of domain and type fields
+- **AND** version indicates addition of score field support
 
 #### Scenario: Migration documentation
 - **WHEN** client receives error about removed fields
 - **THEN** error response includes link to migration guide
 - **AND** migration guide explains how to update client code
 
-#### Scenario: Consistent link sorting behavior
-- **WHEN** client uses HTTP API with `sortLinks: true`
-- **AND** client uses MCP tools with `sortLinks: true`
-- **THEN** both return links arrays sorted identically
-- **AND** sorting algorithm is consistent across both interfaces
+### Requirement: Memory state query support
+The Memory API SHALL support querying memories by their lifecycle state and score.
 
-#### Scenario: Default sorting behavior consistency
-- **WHEN** client uses HTTP API without specifying `sortLinks` parameter
-- **AND** client uses MCP tools without specifying `sortLinks` parameter
-- **THEN** both default to `sortLinks: true`
-- **AND** both return links arrays sorted identically
+#### Scenario: Query with state filter
+- **WHEN** client queries memories with "state" parameter (e.g., "state=active")
+- **THEN** API returns only memories in the specified state
+- **AND** uses score thresholds to determine state (active: 70+, cold: 30-69, deprecated: 0-29)
 
-#### Scenario: Parameter validation consistency
-- **WHEN** client specifies invalid `sortLinks` value in HTTP API
-- **AND** client specifies invalid `sortLinks` value in MCP tools
-- **THEN** both return appropriate validation errors
-- **AND** error messages are consistent in format and content
+#### Scenario: Query with score range
+- **WHEN** client queries memories with "scoreMin" and "scoreMax" parameters
+- **THEN** API returns memories with scores within the specified range
+- **AND** validates that range is within 0-100
+
+#### Scenario: Include all states
+- **WHEN** client queries memories with "includeAllStates=true" parameter
+- **THEN** API returns memories from all states (active, cold, deprecated)
+- **AND** response includes each memory's state as a field
+
+#### Scenario: Sort by score
+- **WHEN** client queries memories with "sortBy=score" parameter
+- **THEN** API returns memories sorted by score (descending by default)
+- **AND** supports ascending/descending order specification
+
+### Requirement: Memory statistics API
+The API SHALL provide endpoints for retrieving memory statistics including score distribution and state counts.
+
+#### Scenario: Get memory statistics
+- **WHEN** client calls memory statistics endpoint
+- **THEN** API returns counts of memories in each state
+- **AND** includes average score, score distribution histogram
+- **AND** includes recent state transition counts
+
+#### Scenario: Get system health
+- **WHEN** client calls system health endpoint
+- **THEN** API includes memory system health metrics
+- **AND** includes last decay calculation timestamp and status
+- **AND** includes scheduler status for decay algorithm
+

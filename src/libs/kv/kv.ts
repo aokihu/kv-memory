@@ -25,7 +25,8 @@ import {
   optimizeFtsIndex as optimizeFtsIndexInDb,
   rebuildFtsIndex as rebuildFtsIndexInDb,
   mergeMemoryPatch,
-  runInTransaction,
+  runBatchInTransactionWithRetry,
+  runInTransactionWithRetry,
   withRenamedMetaId,
   type MemoryLinkRelationReadRow,
   type MemoryRow,
@@ -70,22 +71,29 @@ export class KVMemory {
 
     const writable = memoryToWritableColumns(memory);
 
-    runInTransaction(this._database, () => {
-      this._database
-        .query(
-          `INSERT OR REPLACE INTO memories
-           (key, summary, text, meta, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .run(
-          key,
-          writable.summary,
-          writable.text,
-          writable.meta,
-          writable.created_at,
-        );
+    const writeSteps: Array<() => void> = [
+      () => {
+        this._database
+          .query(
+            `INSERT OR REPLACE INTO memories
+             (key, summary, text, meta, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+          )
+          .run(
+            key,
+            writable.summary,
+            writable.text,
+            writable.meta,
+            writable.created_at,
+          );
+      },
+      () => {
+        this.replaceLinkRelations(key, links, memory.meta.created_at);
+      },
+    ];
 
-      this.replaceLinkRelations(key, links, memory.meta.created_at);
+    await runBatchInTransactionWithRetry(this._database, writeSteps, (step) => step(), {
+      logger: console,
     });
   }
 
@@ -205,11 +213,17 @@ export class KVMemory {
     };
     const writable = memoryToWritableColumns(updated);
 
-    runInTransaction(this._database, () => {
-      this._database
-        .query(`UPDATE memories SET meta = ?, created_at = ? WHERE key = ?`)
-        .run(writable.meta, writable.created_at, key);
-    });
+    await runInTransactionWithRetry(
+      this._database,
+      () => {
+        this._database
+          .query(`UPDATE memories SET meta = ?, created_at = ? WHERE key = ?`)
+          .run(writable.meta, writable.created_at, key);
+      },
+      {
+        logger: console,
+      },
+    );
   }
 
   async update(
@@ -236,24 +250,32 @@ export class KVMemory {
         : patchedMemory;
     const writable = memoryToWritableColumns(updatedMemory);
 
-    runInTransaction(this._database, () => {
-      this._database
-        .query(
-          `UPDATE memories
-           SET summary = ?, text = ?, meta = ?, created_at = ?
-           WHERE key = ?`,
-        )
-        .run(
-          writable.summary,
-          writable.text,
-          writable.meta,
-          writable.created_at,
-          key,
-        );
+    const writeSteps: Array<() => void> = [
+      () => {
+        this._database
+          .query(
+            `UPDATE memories
+             SET summary = ?, text = ?, meta = ?, created_at = ?
+             WHERE key = ?`,
+          )
+          .run(
+            writable.summary,
+            writable.text,
+            writable.meta,
+            writable.created_at,
+            key,
+          );
+      },
+    ];
 
-      if (links) {
+    if (links) {
+      writeSteps.push(() => {
         this.replaceLinkRelations(key, links, updatedMemory.meta.created_at);
-      }
+      });
+    }
+
+    await runBatchInTransactionWithRetry(this._database, writeSteps, (step) => step(), {
+      logger: console,
     });
   }
 
@@ -270,40 +292,49 @@ export class KVMemory {
     };
     const writable = memoryToWritableColumns(updated);
 
-    runInTransaction(this._database, () => {
-      // Insert new key first so FK constraints stay valid for subsequent link updates.
-      this._database
-        .query(
-          `INSERT INTO memories
-           (key, summary, text, meta, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .run(
-          newKey,
-          writable.summary,
-          writable.text,
-          writable.meta,
-          writable.created_at,
-        );
+    const writeSteps: Array<() => void> = [
+      () => {
+        // Insert new key first so FK constraints stay valid for subsequent link updates.
+        this._database
+          .query(
+            `INSERT INTO memories
+             (key, summary, text, meta, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+          )
+          .run(
+            newKey,
+            writable.summary,
+            writable.text,
+            writable.meta,
+            writable.created_at,
+          );
+      },
+      () => {
+        // Keep relation table synchronized for both outgoing and incoming edges.
+        this._database
+          .query(
+            `UPDATE memory_links
+             SET from_key = ?
+             WHERE from_key = ?`,
+          )
+          .run(newKey, oldKey);
+      },
+      () => {
+        this._database
+          .query(
+            `UPDATE memory_links
+             SET to_key = ?
+             WHERE to_key = ?`,
+          )
+          .run(newKey, oldKey);
+      },
+      () => {
+        this._database.query(`DELETE FROM memories WHERE key = ?`).run(oldKey);
+      },
+    ];
 
-      // Keep relation table synchronized for both outgoing and incoming edges.
-      this._database
-        .query(
-          `UPDATE memory_links
-           SET from_key = ?
-           WHERE from_key = ?`,
-        )
-        .run(newKey, oldKey);
-
-      this._database
-        .query(
-          `UPDATE memory_links
-           SET to_key = ?
-           WHERE to_key = ?`,
-        )
-        .run(newKey, oldKey);
-
-      this._database.query(`DELETE FROM memories WHERE key = ?`).run(oldKey);
+    await runBatchInTransactionWithRetry(this._database, writeSteps, (step) => step(), {
+      logger: console,
     });
   }
 

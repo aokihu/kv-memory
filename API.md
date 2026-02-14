@@ -160,6 +160,25 @@ curl -X GET "http://localhost:3000/api/health/memory-system"
 
 ## 配置参数说明
 
+### SQLite 崩溃安全配置说明（本次变更）
+
+本次 `ensure-sqlite-crash-safety` 变更**没有新增或修改 HTTP/MCP API 接口**，
+仅增强 SQLite 运行时持久性与恢复能力。
+
+建议在部署侧关注以下运行配置：
+
+| 环境变量 | 推荐生产值 | 作用 |
+| --- | --- | --- |
+| `KVDB_SQLITE_JOURNAL_MODE` | `WAL` | 启用 WAL 崩溃恢复路径 |
+| `KVDB_SQLITE_SYNCHRONOUS` | `EXTRA` | 提供最高持久性等级 |
+| `KVDB_SQLITE_WAL_CHECKPOINT_INTERVAL_MS` | `60000` | 定时 checkpoint，抑制 WAL 无界增长 |
+| `KVDB_SQLITE_INTEGRITY_CHECK_ON_STARTUP` | `QUICK` | 启动时快速结构一致性检查 |
+
+实现与验证参考：
+
+- 实现：`src/libs/kv/db/config.ts`、`src/libs/kv/db/schema.ts`、`src/libs/kv/db/integrity.ts`
+- 测试：`tests/db.config.test.ts`、`tests/db.schema.test.ts`、`tests/db.integrity.test.ts`、`tests/db.crash-recovery.test.ts`
+
 ### 衰退与状态配置
 
 | 配置项 | 默认值 | 说明 |

@@ -1,69 +1,40 @@
-# Task Plan: Fix full test suite to green
-
-## New Task: Update BULK_READ_GUIDE tool naming
-
-### Goal
-Update `docs/BULK_READ_GUIDE.md` to reflect renamed bulk read tool and parameter schema.
-
-### Current Phase
-Phase 3
-
-### Execution Steps
-#### Phase 1: Inspect document references
-- [x] Locate all `memory_bulk_read` and `totalLimit` references
-- [x] Identify all tool call examples needing updates
-- **Status:** complete
-
-#### Phase 2: Apply scoped documentation edits
-- [x] Rename tool `memory_bulk_read` -> `bulk_read_memory`
-- [x] Rename parameter `totalLimit` -> `total`
-- [x] Update architecture wording to independent bulk-read tool
-- **Status:** complete
-
-#### Phase 3: Verify replacements
-- [x] Re-read edited file and confirm no stale references remain
-- [x] Confirm examples and narrative are internally consistent
-- **Status:** complete
+# Task Plan: FIX_INFINITY_TIMEOUT_003
 
 ## Goal
-Run `bun test`, identify failing tests, implement minimal fixes, and verify all tests pass.
+修复 `src/libs/decay/processor.ts` 中 `withTimeout` 对 `Infinity` 超时值的处理，避免触发 `setTimeout` 的 `TimeoutOverflowWarning`。
 
 ## Current Phase
-Phase 5
+Phase 3 (complete)
 
 ## Phases
-### Phase 1: Failure analysis and grouping
-- [x] Review full test output and cluster failures by root cause
-- [x] Locate impacted source and test files
+### Phase 1: 任务校准与修改点确认
+- [x] 读取 `withTimeout` 当前实现并确认溢出触发路径
+- [x] 确认只修改允许文件与函数范围
+- [x] 记录实现步骤与校验策略
 - **Status:** complete
 
-### Phase 2: Implement root-cause fixes
-- [x] Fix database API compatibility causing `.run` missing failures
-- [x] Fix search service compatibility around optional `kv.getLinks`
-- [x] Fix service method compatibility for namespace and non-namespace call styles
+### Phase 2: 代码修复
+- [x] 在 `withTimeout` 中新增非有限正数超时保护（`Infinity` 场景）
+- [x] 保持原有 `timeoutMs <= 0` 直返行为
+- [x] 保持现有错误语义与 Promise 清理逻辑不变
 - **Status:** complete
 
-### Phase 3: Targeted verification
-- [x] Run focused test files for each fixed failure group
-- [x] Confirm no regressions in touched areas
-- **Status:** complete
-
-### Phase 4: Full verification
-- [x] Re-run `bun test`
-- [x] Confirm all tests pass
-- **Status:** complete
-
-### Phase 5: Delivery
-- [x] Provide detailed test result report and fix summary
+### Phase 3: 验证与交付
+- [x] 运行编译检查
+- [x] 运行相关测试
+- [x] 输出 execute-code-protocol 结果
 - **Status:** complete
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
-| Start with largest shared stack traces first | Maximize fix impact with minimal edits |
-| Use minimal compatible changes | Respect existing behavior and reduce regression risk |
+| 仅在 `withTimeout` 入参分支增加 `Number.isFinite` 守卫 | 最小改动直接覆盖 `Infinity` 触发路径 |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|
-| `session-catchup.py` helper script path missing | 1 | Continue with local planning artifacts and proceed |
+| `session-catchup.py` missing in planning skill assets | 1 | Continue with existing `.plan/Hephaestus` artifacts |
+
+## Notes
+- 严格限制到单文件 `src/libs/decay/processor.ts`。
+- 按 Phase 顺序执行，不跨步。

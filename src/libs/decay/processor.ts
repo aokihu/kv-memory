@@ -259,7 +259,7 @@ function createTimeoutError(timeoutMs: number): Error {
 const INTERRUPTED_ERROR_MESSAGE = "Batch processing interrupted";
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  if (timeoutMs <= 0) {
+  if (timeoutMs <= 0 || !Number.isFinite(timeoutMs)) {
     return promise;
   }
 

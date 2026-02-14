@@ -100,6 +100,20 @@ export class KVMemoryService {
   }
 
   /**
+   * Wrap write operations to keep service-level error logs consistent.
+   *
+   * Debug hint: if a write fails without context, inspect this wrapper log first.
+   */
+  private async executeWriteOperation(operationName: string, handler: () => Promise<void>): Promise<void> {
+    try {
+      await handler();
+    } catch (error) {
+      console.error(`KVMemoryService: ${operationName} failed`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Normalize and validate bulk-read limits.
    *
    * Debug hint: if request rejects valid-looking values, inspect caller types
@@ -156,7 +170,9 @@ export class KVMemoryService {
     const key = typeof keyOrArg === "string" ? keyOrArg : keyOrNamespace;
     const arg = (typeof keyOrArg === "string" ? argOrLinks : keyOrArg) as MemoryNoMeta;
     const links = (typeof keyOrArg === "string" ? maybeLinks : argOrLinks) as MemoryLinkValue[];
-    await this.kv.add(key, arg, links ?? []);
+    await this.executeWriteOperation("addMemory", async () => {
+      await this.kv.add(key, arg, links ?? []);
+    });
   }
 
   /**
@@ -263,7 +279,9 @@ export class KVMemoryService {
     const key = typeof keyOrArg === "string" ? keyOrArg : keyOrNamespace;
     const arg = (typeof keyOrArg === "string" ? argOrLinks : keyOrArg) as Partial<MemoryNoMeta>;
     const links = (typeof keyOrArg === "string" ? maybeLinks : argOrLinks) as MemoryLinkValue[] | undefined;
-    await this.kv.update(key, arg, links);
+    await this.executeWriteOperation("updateMemory", async () => {
+      await this.kv.update(key, arg, links);
+    });
   }
 
   /**
@@ -276,7 +294,24 @@ export class KVMemoryService {
   async updateKey(keyOrNamespace: string, oldKeyOrNewKey: string, maybeNewKey?: string): Promise<void> {
     const oldKey = maybeNewKey === undefined ? keyOrNamespace : oldKeyOrNewKey;
     const newKey = maybeNewKey === undefined ? oldKeyOrNewKey : maybeNewKey;
-    await this.kv.updateKey(oldKey, newKey);
+    await this.executeWriteOperation("updateKey", async () => {
+      await this.kv.updateKey(oldKey, newKey);
+    });
+  }
+
+  /**
+   * Alias of `updateKey` to keep rename semantics explicit in caller code.
+   */
+  async renameMemoryKey(oldKey: string, newKey: string): Promise<void>;
+  async renameMemoryKey(namespace: string, oldKey: string, newKey: string): Promise<void>;
+  async renameMemoryKey(
+    keyOrNamespace: string,
+    oldKeyOrNewKey: string,
+    maybeNewKey?: string,
+  ): Promise<void> {
+    const oldKey = maybeNewKey === undefined ? keyOrNamespace : oldKeyOrNewKey;
+    const newKey = maybeNewKey === undefined ? oldKeyOrNewKey : maybeNewKey;
+    await this.updateKey(oldKey, newKey);
   }
 
   /**

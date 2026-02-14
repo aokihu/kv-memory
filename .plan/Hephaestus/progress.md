@@ -1,82 +1,98 @@
 # Progress Log
 
-## Session: 2026-02-13
+## Session: 2026-02-14 (Task: FIX_INFINITY_TIMEOUT_003)
 
-### New Task: full-suite test recovery
+### Phase 1: 任务校准与修改点确认
 - **Status:** complete
+- **Started:** 2026-02-14
 - Actions taken:
-  - Loaded `planning-with-files` skill (mandatory)
-  - Attempted catchup script; script path not present in skill directory
-  - Ran `bun test`
-  - Captured and read truncated output tail from tool-output file
-  - Recorded failure clusters into findings/plan files
-  - Inspected `src/libs/kv/kv.ts`, `src/service/kvmemory.ts`, `src/service/searchService.ts`, and failing tests
-  - Identified root cause: KVMemoryService namespace-compatible signatures regressed
-- Files created/modified:
-  - `.plan/Hephaestus/task_plan.md`
-  - `.plan/Hephaestus/findings.md`
-  - `.plan/Hephaestus/progress.md`
-
-## Test Results
-| Test | Input | Expected | Actual | Status |
-|------|-------|----------|--------|--------|
-| Full suite | `bun test` | all pass | 91 pass / 45 fail / 1 error (136 total) | fail |
-| Targeted regression | `bun test tests/all.test.ts tests/api-compatibility.test.ts tests/search.service.test.ts` | pass | 30 pass / 0 fail | pass |
-| Targeted MCP+all | `bun test tests/all.test.ts tests/mcp.search-tools.test.ts` | pass | 30 pass / 0 fail | pass |
-| Full suite final | `bun test` | all pass | 150 pass / 0 fail (22 files) | pass |
-
-### Phase 1: Scope verification
-- **Status:** complete
-- Actions taken:
-  - Loaded `planning-with-files` skill
-  - Attempted session catchup execution (path unavailable)
-  - Read target region in `tests/mcp.search-tools.test.ts` around lines 430-569
-  - Confirmed exact two test blocks and safe boundaries
+  - 加载 `planning-with-files` 技能并尝试执行 catchup 脚本（脚本路径不可用）。
+  - 读取 `src/libs/decay/processor.ts`，确认 `withTimeout` 在 `timeoutMs = Infinity` 时会进入 `setTimeout`。
+  - 锁定最小修复策略：在超时短路条件中加入非有限值判断。
 - Files created/modified:
   - `.plan/Hephaestus/task_plan.md` (updated)
   - `.plan/Hephaestus/findings.md` (updated)
   - `.plan/Hephaestus/progress.md` (updated)
 
+### Phase 2: 代码修复
+- **Status:** complete
+- Actions taken:
+  - 在 `src/libs/decay/processor.ts` 的 `withTimeout` 入口条件加入 `!Number.isFinite(timeoutMs)`。
+  - 保持原有 timeout reject 语义与 `clearTimeout` 清理分支不变。
+- Files created/modified:
+  - `src/libs/decay/processor.ts` (modified)
+
+### Phase 3: 验证与交付
+- **Status:** complete
+- Actions taken:
+  - 运行编译检查：`bunx tsc --noEmit`（通过）。
+  - 运行相关测试：`bun test tests/decay.scheduler.test.ts tests/decay.concurrent.test.ts`（13 通过 / 0 失败）。
+  - 准备 execute-code-protocol 交付结果。
+- Files created/modified:
+  - `.plan/Hephaestus/task_plan.md` (updated)
+  - `.plan/Hephaestus/progress.md` (updated)
+
+## Session: 2026-02-14 (Task: SETINTERVAL_TO_SETTIMEOUT_001)
+
+### Phase 1: Scope discovery and baseline capture
+- **Status:** complete
+- **Started:** 2026-02-14
+- Actions taken:
+  - Loaded `planning-with-files` skill as required.
+  - Attempted session catchup script; script not present in installed skill directory.
+  - Initialized task-specific planning artifacts in `.plan/Hephaestus`.
+  - Inspected all three allowed files and mapped every timer-related change point.
+- Files created/modified:
+  - `.plan/Hephaestus/task_plan.md` (updated)
+  - `.plan/Hephaestus/findings.md` (updated)
+  - `.plan/Hephaestus/progress.md` (updated)
+
+### Phase 2: Apply timer refactor in runtime code
+- **Status:** complete
+- Actions taken:
+  - Replaced WAL checkpoint interval loop with recursive timeout loop in `src/libs/kv/db/schema.ts`.
+  - Replaced scheduler task interval loop with recursive timeout loop in `src/libs/scheduler/task.ts`.
+  - Updated timer cleanup and type declarations from interval to timeout variants.
+- Files created/modified:
+  - `src/libs/kv/db/schema.ts` (modified)
+  - `src/libs/scheduler/task.ts` (modified)
+
+### Phase 3: Apply timer refactor in tests
+- **Status:** complete
+- Actions taken:
+  - Replaced spawned script keepalive loops from `setInterval` to recursive `setTimeout` in `tests/db.crash-recovery.test.ts`.
+  - Kept crash simulation behavior unchanged by maintaining non-terminating event-loop activity.
+- Files created/modified:
+  - `tests/db.crash-recovery.test.ts` (modified)
+
+### Phase 4: Verification and delivery
+- **Status:** complete
+- Actions taken:
+  - Ran compile validation: `bunx tsc --noEmit` (passed, no errors).
+  - Ran targeted tests: `bun test tests/db.crash-recovery.test.ts tests/decay.scheduler.test.ts` (10 passed, 0 failed).
+  - Verified no `setInterval(` and no `clearInterval(` remain in the three allowed files.
+  - Prepared final execute-code-protocol response.
+- Files created/modified:
+  - `.plan/Hephaestus/task_plan.md` (updated)
+  - `.plan/Hephaestus/progress.md` (updated)
+
 ## Test Results
 | Test | Input | Expected | Actual | Status |
 |------|-------|----------|--------|--------|
-| Search tools test file | `bun test tests/mcp.search-tools.test.ts` | File compiles/runs after deletions | 15 tests executed, 13 pass, 2 fail (unrelated sortLinks assertions) | partial |
-
-### Phase 2: Implementation
-- **Status:** complete
-- Actions taken:
-  - Removed test `memory_get supports bulkRead traversal payload`
-  - Removed test `memory_get bulkRead validates limit parameters`
-  - Verified surrounding tests remain intact
-- Files created/modified:
-  - `tests/mcp.search-tools.test.ts` (updated)
-
-### Phase 3: Verification
-- **Status:** complete
-- Actions taken:
-  - Ran `bun test tests/mcp.search-tools.test.ts`
-  - Confirmed target file compiles and test runner executes after removal
-  - Observed 2 existing failures in unrelated sortLinks tests
-- Files created/modified:
-  - `.plan/Hephaestus/task_plan.md` (updated)
+| Compile check | `bunx tsc --noEmit` | No type errors | No output / success | Pass |
+| Targeted tests | `bun test tests/db.crash-recovery.test.ts tests/decay.scheduler.test.ts` | All tests pass | 10 pass / 0 fail | Pass |
+| Timer API scan | grep `setInterval\(` and `clearInterval\(` in allowed files | No matches | No matches | Pass |
 
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
-| 2026-02-13 | `session-catchup.py` not found from env path | 1 | Continued with manual planning files |
-| 2026-02-13 | 2 failing assertions in unrelated sortLinks tests | 1 | Left unchanged to keep requested scope |
-| 2026-02-13 | `bun test` output truncated in tool response | 1 | Read saved tool output file directly for summary lines |
+| 2026-02-14 | `session-catchup.py` missing in skill path | 1 | Proceeded with manual planning files |
 
-### New Task: update bulk-read documentation naming
-- **Status:** complete
-- Actions taken:
-  - Read `docs/BULK_READ_GUIDE.md` and located all old naming references
-  - Updated MCP tool name to `bulk_read_memory`
-  - Updated parameter name from `totalLimit` to `total`
-  - Updated usage examples and troubleshooting text
-  - Added architecture note that `bulk_read_memory` is an independent MCP tool
-- Files created/modified:
-  - `docs/BULK_READ_GUIDE.md` (updated)
-  - `.plan/Hephaestus/task_plan.md` (updated)
-  - `.plan/Hephaestus/findings.md` (updated)
-  - `.plan/Hephaestus/progress.md` (updated)
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Delivery complete |
+| Where am I going? | Wait for Zeus review or next task |
+| What's the goal? | Replace `setInterval` loops with recursive `setTimeout` while preserving behavior |
+| What have I learned? | Recursive timeout refactor preserves behavior when scheduling continues only in running state |
+| What have I done? | Completed all required edits and verification for SETINTERVAL_TO_SETTIMEOUT_001 |

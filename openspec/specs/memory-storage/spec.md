@@ -2,9 +2,7 @@
 
 ## Purpose
 TBD - created by archiving change kv-to-sqlite. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: SQLite-based memory storage
 The system SHALL use native SQLite with `bun:sqlite` instead of Keyv for memory persistence. The storage implementation SHALL support field-level storage of memory components in separate columns for efficient querying and incremental updates. The storage SHALL also support FTS5 full-text search indexing.
 
@@ -33,8 +31,9 @@ The system SHALL implement a database schema with the following tables and colum
 
 #### Scenario: Memories table structure
 - **WHEN** the database is initialized
-- **THEN** a `memories` table exists with columns: key (TEXT PRIMARY KEY), summary (TEXT), text (TEXT), meta (TEXT), links (TEXT), created_at (INTEGER)
+- **THEN** a `memories` table exists with columns: key (TEXT PRIMARY KEY), summary (TEXT), text (TEXT), meta (TEXT), links (TEXT), created_at (INTEGER), score (INTEGER)
 - **AND** the table does NOT have legacy classification columns (domain/type/tag)
+- **AND** the score column stores integer values between 0-100 with default value 50
 
 #### Scenario: Memory links table structure
 - **WHEN** the database is initialized
@@ -52,11 +51,13 @@ The system SHALL provide a migration script to convert existing Keyv SQLite data
 - **WHEN** the migration script is run against an existing Keyv database
 - **THEN** all data is successfully migrated to the new schema without data loss
 - **AND** FTS5 indexes are created if search feature is enabled
+- **AND** existing memories have their score field initialized to 50
 
 #### Scenario: Migration idempotency
 - **WHEN** the migration script is run multiple times
 - **THEN** subsequent runs have no effect and do not corrupt data
 - **AND** FTS5 indexes are only created if they don't exist
+- **AND** score column is only added if it doesn't exist
 
 ### Requirement: Performance improvements
 The system SHALL provide performance improvements over the previous Keyv implementation, including efficient full-text search capabilities.
@@ -73,3 +74,39 @@ The system SHALL provide performance improvements over the previous Keyv impleme
 - **WHEN** performing full-text search on memory content
 - **THEN** the query uses FTS5 virtual table and returns results efficiently
 - **AND** relevance ranking is computed by SQLite FTS5 engine
+
+#### Scenario: Score-based query performance
+- **WHEN** querying memories by score range or state
+- **THEN** the query uses the score column index for efficient filtering
+- **AND** returns results sorted by score when requested
+
+### Requirement: SQLite durability configuration
+The system SHALL configure SQLite for crash safety and data durability to prevent data loss during unexpected server termination.
+
+#### Scenario: WAL mode enabled by default
+- **WHEN** the database connection is initialized
+- **THEN** the system sets journal_mode to WAL
+- **AND** WAL mode remains active for all subsequent operations
+
+#### Scenario: Synchronous mode configuration
+- **WHEN** the database connection is initialized
+- **THEN** the system sets synchronous to FULL or EXTRA
+- **AND** write operations wait for data to reach stable storage before returning
+
+#### Scenario: Connection durability settings
+- **WHEN** the database connection is initialized
+- **THEN** the following durability settings are applied:
+  - busy_timeout = 5000 (5 seconds)
+  - cache_size = -64000 (64MB)
+  - temp_store = memory
+
+#### Scenario: Safe connection closure
+- **WHEN** the database connection needs to be closed
+- **THEN** the system first executes PRAGMA wal_checkpoint(TRUNCATE)
+- **AND** waits for checkpoint completion before closing the connection
+
+#### Scenario: Startup WAL recovery
+- **WHEN** the system starts and detects WAL files exist
+- **THEN** it opens the database (SQLite automatically performs recovery)
+- **AND** executes an explicit checkpoint to ensure data integrity
+

@@ -2,19 +2,32 @@
   "name": "kvdb-mem",
   "module": "index.ts",
   "type": "module",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
+  "bin": {
+    "kvdb-mem": "./dist/kvdb-mem"
+  },
   "scripts": {
     "dev": "bun run --watch ./src/index.ts",
     "mcp": "bun run ./src/mcp/index.ts",
     "dev:mcp": "bun run --watch ./src/mcp/index.ts",
     "dev:all": "bun run --watch ./src/index.ts & bun run --watch ./src/mcp/index.ts",
+    "cli": "bun run ./src/cli/index.ts",
+    "cli:backup": "bun run ./src/cli/index.ts backup",
+    "cli:repair": "bun run ./src/cli/index.ts repair",
+    "cli:check": "bun run ./src/cli/index.ts check",
+    "build": "bun run ./build.ts",
+    "build:cli": "bun run ./build.ts",
     "test:mcp": "bun run ./test-mcp.js",
     "bench": "bun run ./benchmarks/index.ts",
     "bench:kv": "bun run ./benchmarks/kv-performance.ts",
     "bench:links": "bun run ./benchmarks/link-traversal.ts",
+    "bench:sqlite-safety": "bun run ./benchmarks/sqlite-crash-safety.ts",
     "deploy:dry-run": "bash ./scripts/migration-dry-run.sh",
-    "deploy:verify": "bunx tsc --noEmit && bun test tests/kv.sqlite.test.ts tests/db.schema.test.ts tests/db.migrate.test.ts tests/api-compatibility.test.ts tests/concurrent-access.test.ts tests/final-verification.test.ts"
+    "deploy:verify": "bunx tsc --noEmit && bun test tests/kv.sqlite.test.ts tests/db.schema.test.ts tests/db.migrate.test.ts tests/api-compatibility.test.ts tests/concurrent-access.test.ts tests/final-verification.test.ts",
+    "script:backup": "bun run ./scripts/backup-kv-db.ts",
+    "script:repair": "bun run ./scripts/repair-fts5-index.ts",
+    "script:check": "bun run ./scripts/test-startup-fts5-integrity.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

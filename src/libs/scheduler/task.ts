@@ -19,7 +19,7 @@ export class SchedulerTask {
 
   private intervalMs: number;
   private status: SchedulerTaskStatus;
-  private timer: ReturnType<typeof setInterval> | null;
+  private timer: ReturnType<typeof setTimeout> | null;
   private isExecuting: boolean;
 
   private readonly metrics: SchedulerTaskMetrics;
@@ -57,9 +57,7 @@ export class SchedulerTask {
     this.clearTimer();
     this.status = "running";
     this.metrics.nextRunAt = Date.now() + this.intervalMs;
-    this.timer = setInterval(() => {
-      void this.execute();
-    }, this.intervalMs);
+    this.scheduleNextExecution();
   }
 
   /**
@@ -105,9 +103,7 @@ export class SchedulerTask {
     if (this.status === "running") {
       this.clearTimer();
       this.metrics.nextRunAt = Date.now() + this.intervalMs;
-      this.timer = setInterval(() => {
-        void this.execute();
-      }, this.intervalMs);
+      this.scheduleNextExecution();
     }
   }
 
@@ -172,9 +168,26 @@ export class SchedulerTask {
    */
   private clearTimer(): void {
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
     }
+  }
+
+  /**
+   * Schedules next execution tick while task remains running.
+   */
+  private scheduleNextExecution(): void {
+    if (this.status !== "running") {
+      return;
+    }
+
+    this.timer = setTimeout(() => {
+      void this.execute();
+
+      if (this.status === "running") {
+        this.scheduleNextExecution();
+      }
+    }, this.intervalMs);
   }
 
   /**

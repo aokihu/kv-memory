@@ -1,44 +1,25 @@
 # Findings & Decisions
 
-## Current Task Requirements
-- Run full test suite with `bun test`
-- Ensure all expected existing tests pass
-- If failures exist, analyze and fix
+## Requirements
+- 仅修复 `src/libs/decay/processor.ts` 中 `withTimeout` 的 `Infinity` 超时处理。
+- 当 `timeoutMs` 为 `Infinity` 时，必须直接返回原 Promise，不调用 `setTimeout`。
+- 不修改其他文件，不新增依赖。
 
-## Failure Snapshot (initial `bun test`)
-- Totals: `91 pass`, `45 fail`, `1 error`, `136 tests / 22 files`
-- High-frequency failure signature: `TypeError ... .run is not a function`
-  - Seen in `src/libs/kv/kv.ts` constructor (`this._database.run(...)`)
-  - Seen in tests calling `db.query(...).run(...)`
-- Search service failure signature: `this.kv.getLinks is not a function`
-- API compatibility failure signature: Zod expects object but receives string in add/get flow
+## Research Findings
+- 当前实现仅在 `timeoutMs <= 0` 时直返 Promise。
+- `Infinity` 满足 `> 0`，会进入 `setTimeout(..., Infinity)`，触发 Node/Bun 的超时溢出警告。
+- 最小修复点是 `withTimeout` 入口分支，增加 `!Number.isFinite(timeoutMs)` 的直返条件。
+- 该改动不会改变已有 `timeoutMs <= 0` 行为，也不会影响 timeout reject 与 `clearTimeout` 清理路径。
 
-## Working Hypotheses
-1. DB compatibility layer changed, but code/tests still rely on statement `.run()` and/or db `.run()` methods.
-2. `SearchService` now assumes `kv.getLinks` exists, but mock in unit tests does not provide it.
-3. Request schema for add-memory no longer accepts test payload shape.
+## Technical Decisions
+| Decision | Rationale |
+|----------|-----------|
+| 使用 `if (timeoutMs <= 0 || !Number.isFinite(timeoutMs)) return promise;` | 同时覆盖 `Infinity` 与其他非有限值，保持最小行为变更 |
 
-## Resolutions Applied
-- Restored KVMemoryService backward-compatible overloads for namespace and non-namespace call styles (`addMemory`, `updateMemory`, `updateKey`, `traverseMemory`).
-- Updated `KVMemory` startup PRAGMA calls to use `exec`.
-- Updated `SearchService`:
-  - dependency injection support for unit tests (database/searchEnabled)
-  - namespace SQL compatibility (`AND key LIKE ?` when no join)
-  - optional `kv.getLinks` fallback to empty links
-  - omit empty links in result payload for compatibility
-- Removed global module mock coupling in `tests/search.service.test.ts` to prevent cross-file contamination.
-- Added `sortLinks` validation to MCP `MemoryGetSchema`.
-- Stabilized `tests/all.test.ts` keys with run-specific suffix to avoid cross-run conflicts.
+## Issues Encountered
+| Issue | Resolution |
+|-------|------------|
+| planning skill 的 `session-catchup.py` 脚本路径不可用 | 使用现有 `.plan/Hephaestus` 文件继续执行 |
 
 ## Resources
-- `/home/aokihu/.local/share/opencode/tool-output/tool_c571cafda001wk2Rd3gR2eD0oz`
-- `src/libs/kv/kv.ts`
-- `src/service/searchService.ts`
-- `tests/all.test.ts`
-
-## New Task Findings: BULK_READ_GUIDE naming migration
-- Target file: `docs/BULK_READ_GUIDE.md`
-- Replaced MCP tool name: `memory_bulk_read` -> `bulk_read_memory`
-- Replaced MCP parameter name: `totalLimit` -> `total`
-- Updated all related MCP JSON examples and textual references
-- Added explicit architecture statement: `bulk_read_memory` is a standalone MCP bulk-read tool
+- `src/libs/decay/processor.ts`

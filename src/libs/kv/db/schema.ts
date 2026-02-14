@@ -1,8 +1,27 @@
 import { Database } from "bun:sqlite";
+import { existsSync } from "node:fs";
 import { getDatabaseConfig } from "./config";
+import { runFts5IntegrityCheck, runIntegrityCheck, runQuickCheck } from "./integrity";
+import {
+  addScoreColumnToMemories,
+  createScoreIndexOnMemories,
+  initializeExistingMemoryScores,
+} from "./migration";
 
 let databaseSingleton: Database | null = null;
 let databaseSingletonPath: string | null = null;
+let walCheckpointTimer: ReturnType<typeof setTimeout> | null = null;
+
+type WalCheckpointRow = {
+  busy?: number;
+  log?: number;
+  checkpointed?: number;
+};
+
+type WalResidueDetection = {
+  walFileExists: boolean;
+  shmFileExists: boolean;
+};
 
 /**
  * Get the shared database instance.
@@ -25,11 +44,26 @@ export function getDatabase(databaseFile?: string): Database {
 
   const db = new Database(targetPath);
   db.exec(`PRAGMA journal_mode = ${config.pragma.journalMode}`);
+  db.exec(`PRAGMA synchronous = ${config.pragma.synchronous}`);
   db.exec(`PRAGMA busy_timeout = ${config.pragma.busyTimeoutMs}`);
+  db.exec("PRAGMA cache_size = -64000");
+  db.exec("PRAGMA temp_store = MEMORY");
   db.exec(`PRAGMA foreign_keys = ${config.pragma.foreignKeys ? "ON" : "OFF"}`);
+
+  const walResidue = detectWalResidue(targetPath);
+  if (walResidue !== null && (walResidue.walFileExists || walResidue.shmFileExists)) {
+    console.info(
+      `[db] startup detected WAL residue for '${targetPath}' (wal=${walResidue.walFileExists}, shm=${walResidue.shmFileExists})`,
+    );
+    performWalCheckpoint(db, targetPath, "startup-recovery");
+  }
+
+  performStartupIntegrityCheck(db, targetPath, config.maintenance.startupIntegrityCheck);
+  performStartupFts5IntegrityCheck(db, targetPath, config.maintenance.startupFts5IntegrityCheck);
 
   databaseSingleton = db;
   databaseSingletonPath = targetPath;
+  setupPeriodicWalCheckpoint(db, targetPath, config.maintenance.walCheckpointIntervalMs);
 
   return db;
 }
@@ -44,9 +78,114 @@ export function closeDatabase(): void {
     return;
   }
 
-  databaseSingleton.close(false);
-  databaseSingleton = null;
-  databaseSingletonPath = null;
+  const db = databaseSingleton;
+  const databasePath = databaseSingletonPath;
+
+  if (walCheckpointTimer !== null) {
+    clearTimeout(walCheckpointTimer);
+    walCheckpointTimer = null;
+  }
+
+  performWalCheckpoint(db, databasePath, "closeDatabase");
+
+  try {
+    db.close(false);
+  } catch (error) {
+    console.error(`[db] closeDatabase close failed for '${databasePath ?? "unknown"}'`, error);
+  } finally {
+    databaseSingleton = null;
+    databaseSingletonPath = null;
+  }
+}
+
+function detectWalResidue(databasePath: string): WalResidueDetection | null {
+  if (databasePath === ":memory:" || databasePath.length === 0) {
+    return null;
+  }
+
+  return {
+    walFileExists: existsSync(`${databasePath}-wal`),
+    shmFileExists: existsSync(`${databasePath}-shm`),
+  };
+}
+
+function performWalCheckpoint(db: Database, databasePath: string | null, source: string): void {
+  try {
+    const checkpointRow = db.query("PRAGMA wal_checkpoint(TRUNCATE)").get() as WalCheckpointRow | null;
+    if (checkpointRow?.busy !== undefined && checkpointRow.busy > 0) {
+      console.warn(
+        `[db] ${source} checkpoint returned busy=${checkpointRow.busy} for '${databasePath ?? "unknown"}'`,
+      );
+    } else {
+      console.info(`[db] ${source} checkpoint completed for '${databasePath ?? "unknown"}'`);
+    }
+  } catch (error) {
+    // If checkpoint fails, continue lifecycle to avoid dangling singleton or file locks.
+    console.error(`[db] ${source} checkpoint failed for '${databasePath ?? "unknown"}'`, error);
+  }
+}
+
+function setupPeriodicWalCheckpoint(db: Database, databasePath: string, intervalMs: number): void {
+  if (intervalMs <= 0) {
+    return;
+  }
+
+  const scheduleNextCheckpoint = (): void => {
+    walCheckpointTimer = setTimeout(() => {
+      performWalCheckpoint(db, databasePath, "periodic-checkpoint");
+
+      if (walCheckpointTimer === null) {
+        return;
+      }
+
+      scheduleNextCheckpoint();
+    }, intervalMs);
+
+    // Timer should not keep process alive during shutdown in tests and CLI workloads.
+    walCheckpointTimer.unref?.();
+  };
+
+  scheduleNextCheckpoint();
+}
+
+function performStartupIntegrityCheck(db: Database, databasePath: string, mode: "OFF" | "QUICK" | "FULL"): void {
+  if (mode === "OFF") {
+    return;
+  }
+
+  try {
+    const result = mode === "QUICK" ? runQuickCheck(db) : runIntegrityCheck(db);
+    if (result.ok) {
+      console.info(`[db] startup ${result.mode}_check passed for '${databasePath}'`);
+      return;
+    }
+
+    console.error(
+      `[db] startup ${result.mode}_check failed for '${databasePath}': ${result.messages.join(" | ")}`,
+    );
+  } catch (error) {
+    console.error(`[db] startup integrity check failed for '${databasePath}'`, error);
+  }
+}
+
+function performStartupFts5IntegrityCheck(db: Database, databasePath: string, mode: "OFF" | "QUICK" | "FULL"): void {
+  if (mode === "OFF") {
+    return;
+  }
+
+  try {
+    const result = runFts5IntegrityCheck(db, mode);
+    if (result.ok) {
+      console.info(`[db] startup fts5 integrity check (${mode}) passed for '${databasePath}'`);
+      return;
+    }
+
+    console.error(
+      `[db] startup fts5 integrity check (${mode}) failed for '${databasePath}': ${result.issues.join(" | ")}`,
+    );
+  } catch (error) {
+    console.error(`[db] startup fts5 integrity check failed for '${databasePath}'`, error);
+  }
 }
 
 /**
@@ -59,6 +198,9 @@ export function initDatabase(db: Database): Database {
 
 export function initSchema(db: Database) {
   ensureMemoriesTable(db);
+  addScoreColumnToMemories(db);
+  createScoreIndexOnMemories(db);
+  initializeExistingMemoryScores(db);
   ensureMemoryLinksTable(db);
   ensureKvCacheTable(db);
 
